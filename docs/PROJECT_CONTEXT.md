@@ -1,9 +1,10 @@
 # Proje Bağlamı — Last.fm ETL Pipeline
 
-Bu dosya projenin **sabit sözleşmesidir**: hedef, tercihler, yol haritası. Nadiren değişir.
+Bu dosya projenin **sabit sözleşmesidir**: hedef, tercihler, mimari. Nadiren değişir.
 
 > **Güncel durum bu dosyada değildir.** Nerede kaldığımız için → [`PROGRESS.md`](PROGRESS.md)
-> İki yerde durum tutmak = iki gerçek = kaçınılmaz sapma.
+> **Detaylı plan da bu dosyada değildir.** Alt adımlar için → [`ROADMAP.md`](ROADMAP.md)
+> Aynı bilgiyi iki yerde tutmak = iki gerçek = kaçınılmaz sapma.
 
 ---
 
@@ -126,24 +127,20 @@ taklit eder, böylece AWS'ye taşırken yol mantığı değişmez. `/data/` giti
 
 ## 5. Yol haritası
 
-Her adım bitince commit atılır. Bir sonrakine geçmeden önce çalıştığı doğrulanır.
+Proje 9 adımdan oluşur. Adımların alt adımları, "bitti" tanımları, ADR adayları ve
+aralarındaki bağımlılıklar → [`ROADMAP.md`](ROADMAP.md)
 
-| # | Adım | Ne öğreneceğim |
-|---|---|---|
-| 0 | Repo kurulumu | `.gitignore`, `src/` layout, `pyproject.toml`, neden `__init__.py` |
-| 1 | Veriyi tanı | API'yi elle çağır, gerçek payload'ı kaydet, grain ve şema kararı |
-| 2 | Config | Pydantic Settings, import-time yan etkileri, secret yönetimi |
-| 3 | Extract client | Retry + exponential backoff, timeout, rate limit, gövdedeki hata |
-| 4 | Raw katman | Immutable landing zone, partition, idempotency, neden ham saklanır |
-| 5 | Transform | Saf fonksiyonlar, Pydantic ile şema doğrulama, düzleştirme, Parquet |
-| 6 | Orkestrasyon | `main.py`, CLI argümanları, backfill, structured logging, exit code |
-| 7 | Test | Gerçek payload'ı fixture yapmak, transform testi, HTTP mock'lama |
-| 8 | Paketleme + CI | `Makefile`, `ruff`, `mypy`, GitHub Actions, Dockerfile |
-| 9 | AWS'ye taşıma | S3, Lambda, EventBridge, Glue Crawler, Athena, IAM, maliyet |
+Burada tekrarlanmaz. Plan revize edilirken iki dosyayı senkron tutmak, er ya da geç
+tutmamak demektir.
+
+Her adım bitince commit atılır. Bir sonrakine geçmeden önce çalıştığı doğrulanır.
 
 ---
 
 ## 6. "Bitti" ne demek — her adım için kontrol listesi
+
+Bu **genel** listedir, her adım için geçerlidir. Adıma özel ek şartlar
+[`ROADMAP.md`](ROADMAP.md)'de her adımın altında yazar.
 
 Bir adım şu şartları sağlamadan bitmiş sayılmaz:
 
@@ -181,7 +178,8 @@ orchestration DAG'ı · maliyet optimizasyonu (dosya boyutu, partition sayısı)
 
 | Yol | Ne tutar | Dil | Ne sıklıkla değişir |
 |---|---|---|---|
-| `docs/PROJECT_CONTEXT.md` | Sabit sözleşme — hedef, tercihler, yol haritası | TR | Nadiren |
+| `docs/PROJECT_CONTEXT.md` | Sabit sözleşme — hedef, tercihler, mimari | TR | Nadiren |
+| `docs/ROADMAP.md` | **Plan.** Alt adımlar, bitti tanımları, bağımlılıklar | TR | Adım revize edildikçe |
 | `docs/PROGRESS.md` | **Güncel durum.** Tek durum kaynağı. | TR | Her alt adımda |
 | `docs/adr/` | Bu projeye özel mimari kararlar | EN | Karar çıktıkça |
 | `docs/notes/` | Genel öğrenme notları | TR | Konu öğrenildikçe |

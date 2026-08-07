@@ -1,7 +1,10 @@
 # Progress
 
-Bu dosya projenin **tek durum kaynağıdır**. Her oturumun başında okunur, her alt adımın
-sonunda güncellenir.
+Bu dosya projenin **tek durum kaynağıdır**: sadece *nerede olduğumu* tutar.
+Her oturumun başında okunur, her alt adımın sonunda güncellenir.
+
+> **Plan burada değildir.** Alt adım listesi, "bitti" tanımları ve bağımlılıklar için
+> → [`ROADMAP.md`](ROADMAP.md)
 
 Kural: bu dosya yalan söyleyebilir (güncellemeyi unutursan). `git log --oneline` söyleyemez.
 Çelişki varsa git haklıdır.
@@ -9,7 +12,7 @@ Kural: bu dosya yalan söyleyebilir (güncellemeyi unutursan). `git log --onelin
 ---
 
 **Last updated:** 2026-08-07 (iş bilgisayarı — eve devam edilecek)
-**Current step:** 0 — Repo setup
+**Current step:** 0 — Repo setup ([plan](ROADMAP.md#adım-0--repo-kurulumu))
 **Next sub-step:** 0.3 — `pyproject.toml` + `src/` layout
 
 **Sıradaki oturumda cevaplanacak açık soru:**
@@ -18,17 +21,6 @@ Kural: bu dosya yalan söyleyebilir (güncellemeyi unutursan). `git log --onelin
 > (Barış bu soruya cevap vermeden 0.3 anlatılmaya başlanmayacak.)
 
 ---
-
-## Adım 0 alt adımları
-
-| # | Alt adım | Durum |
-|---|---|---|
-| 0.1 | `.gitignore` | ✅ bitti |
-| 0.2 | İlk commit | ✅ bitti |
-| 0.3 | `pyproject.toml` + `src/` layout | ⬜ sıradaki |
-| 0.4 | Sanal ortam (`uv` / `venv`) | ⬜ |
-| 0.5 | `README.md` + `.env.example` | ⬜ |
-| 0.6 | Adım 0 kapanış commit'i | ⬜ |
 
 ## Tamamlananlar
 
