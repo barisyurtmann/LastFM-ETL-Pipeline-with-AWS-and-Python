@@ -8,9 +8,14 @@ Kural: bu dosya yalan söyleyebilir (güncellemeyi unutursan). `git log --onelin
 
 ---
 
-**Last updated:** 2026-08-07
+**Last updated:** 2026-08-07 (iş bilgisayarı — eve devam edilecek)
 **Current step:** 0 — Repo setup
 **Next sub-step:** 0.3 — `pyproject.toml` + `src/` layout
+
+**Sıradaki oturumda cevaplanacak açık soru:**
+> Kodu neden `src/` klasörünün içine koyuyoruz? Repo kökünde `lastfm_etl/` olsa ne
+> değişirdi — somut teknik bir sonucu var mı, yoksa sadece düzen meselesi mi?
+> (Barış bu soruya cevap vermeden 0.3 anlatılmaya başlanmayacak.)
 
 ---
 
@@ -30,7 +35,9 @@ Kural: bu dosya yalan söyleyebilir (güncellemeyi unutursan). `git log --onelin
 - [x] **0.1** `.gitignore` yazıldı ve `git check-ignore -v` ile doğrulandı.
       Kritik kontrol: `src/lastfm_etl/raw` **eşleşmedi** — kalıplar yeterince dar yazılmış.
 - [x] **0.2** İlk commit atıldı: `chore: add .gitignore`
-- [x] `docs/` yapısı kuruldu (PROGRESS, ADR, notes)
+- [x] `docs/` yapısı kuruldu (PROGRESS, ADR, notes) — `docs: add project documentation structure`
+      ADR-0001 yazıldı, `PROJECT_CONTEXT.md` Claude proje bilgisinden repoya taşındı,
+      custom instructions yenilendi.
 
 ## Açık sorular
 

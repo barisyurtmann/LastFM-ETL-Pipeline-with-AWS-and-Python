@@ -155,3 +155,30 @@ Sebep: `__pycache__/` kalıbındaki sondaki `/` "sadece klasör" demek. Diskte o
 klasör-kalıbıyla eşleştirmez. Sona `/` koyduğun an eşleşir.
 
 `data/raw` eşleşir çünkü içinde `/` var — git `data`'nın klasör olduğunu string'den anlar.
+
+## Bonus: `git status` "M" diyor ama `git diff` boş
+
+Bunu yaşadık. Sebep: `git status` pasif bir okuma **değildir**.
+
+Git her dosyanın boyutunu ve mtime'ını **index** dosyasında önbellekler (stat cache).
+`status` çalışırken diskteki gerçek değerlerle karşılaştırır; farklıysa dosyanın içeriğini
+okur ve index'i tazeler. Bu tazeleme bir **yazma** işlemidir ve `.git/index.lock` gerektirir.
+
+Yazma izni yoksa (bizim durumda salt-okunur bir ortamdan çalıştırıldı) git index'i
+tazeleyemez, elindeki bayat stat bilgisiyle "değişmiş olabilir" der:
+
+```
+warning: unable to unlink '.git/index.lock': Operation not permitted
+ M .gitignore
+```
+
+**Kural: `git status` "M" der ama `git diff` boşsa, dosya değişmemiştir.**
+İçerik karşılaştırması otoritedir, stat cache değil.
+
+Aynı durum normal kullanımda da olur: dosyaya `touch` atarsan veya bir editör aynı içeriği
+yeniden kaydederse mtime değişir, git bir an "modified" gösterir, `git status`'ü tekrar
+çalıştırınca kendiliğinden düzelir (çünkü bu kez index'i tazeleyebilir).
+
+Genel ders — bu projede tekrar tekrar karşımıza çıkacak: **cache ile gerçek arasında sapma
+olabilir. Şüphede kaldığında cache'e değil kaynağa bak.** `PROGRESS.md` vs `git log`
+ilişkisi de aynı problem.
