@@ -17,6 +17,7 @@ Testi tek soru: **"Bu bilgi başka bir projede de geçerli mi?"**
 |---|---|---|
 | [01](01-git-and-gitignore.md) | Git temelleri ve `.gitignore` | 0.1 |
 | [02](02-commit-conventions.md) | Commit mesajları ve ilk commit | 0.2 |
+| [03](03-line-endings.md) | Satır sonları (CRLF/LF) ve `.gitattributes` | 0.2–0.3 arası |
 
 ---
 

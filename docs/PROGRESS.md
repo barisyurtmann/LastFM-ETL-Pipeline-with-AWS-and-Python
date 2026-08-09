@@ -11,7 +11,7 @@ Kural: bu dosya yalan söyleyebilir (güncellemeyi unutursan). `git log --onelin
 
 ---
 
-**Last updated:** 2026-08-07 (iş bilgisayarı — eve devam edilecek)
+**Last updated:** 2026-08-09 (ev bilgisayarı)
 **Current step:** 0 — Repo setup ([plan](ROADMAP.md#adım-0--repo-kurulumu))
 **Next sub-step:** 0.3 — `pyproject.toml` + `src/` layout
 
@@ -30,6 +30,11 @@ Kural: bu dosya yalan söyleyebilir (güncellemeyi unutursan). `git log --onelin
 - [x] `docs/` yapısı kuruldu (PROGRESS, ADR, notes) — `docs: add project documentation structure`
       ADR-0001 yazıldı, `PROJECT_CONTEXT.md` Claude proje bilgisinden repoya taşındı,
       custom instructions yenilendi.
+- [x] **CRLF/LF normalizasyonu** (ROADMAP'te yazmayan, araya giren iş).
+      `.gitattributes` ile `* text=auto eol=lf` — `chore: enforce LF line endings via .gitattributes`
+      Semptom: içerik değişmeden `1127 insertions / 1127 deletions`. Sebep: iş
+      makinesi tüm docs'u CRLF ile yeniden yazmıştı.
+      `git ls-files --eol` ile `i/lf w/lf` doğrulandı. Not: `docs/notes/03-line-endings.md`
 
 ## Açık sorular
 
@@ -47,3 +52,5 @@ Kural: bu dosya yalan söyleyebilir (güncellemeyi unutursan). `git log --onelin
 ## Sonraki oturum için hatırlatma
 
 - Oturuma `git pull` ile başla, `git push` ile bitir. İki makinede çalışılıyor.
+- İş makinesinde ilk `git pull`'dan sonra `git status` **temiz** olmalı. Kirliyse
+  `.gitattributes` orada uygulanmamış demektir — `git ls-files --eol` ile bak.
