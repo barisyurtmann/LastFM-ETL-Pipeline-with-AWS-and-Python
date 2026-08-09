@@ -1,0 +1,8 @@
+# Normalize all text files to LF in the repository and on disk.
+# Without this, the Windows machine rewrites every file with CRLF and
+# every diff becomes unreadable. Overrides per-machine core.autocrlf.
+* text=auto eol=lf
+
+# Binary files must never be touched by the eol filter.
+*.parquet binary
+*.png     binary
