@@ -24,6 +24,7 @@ Testi tek soru: **"Bu bilgi başka bir projede de geçerli mi?"**
 | [07](07-staging-area-and-atomic-commits.md) | Staging area, `git diff --staged`, atomik commit | 0.4 |
 | [08](08-virtual-environments-and-uv.md) | Sanal ortamlar, editable install, lock dosyası, `uv` (kavramlar) | 0.4 |
 | [09](09-uv-workflows-and-classic-equivalents.md) | `uv` iş akışları, komut referansı, `uv`'siz karşılıkları | 0.4 |
+| [10](10-writing-a-readme.md) | README yazmak: okuyucular, bölümler, test etme, anti-pattern'lar | 0.5 |
 
 ---
 

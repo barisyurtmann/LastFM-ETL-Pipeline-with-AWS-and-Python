@@ -13,15 +13,16 @@ Kural: bu dosya yalan söyleyebilir (güncellemeyi unutursan). `git log --onelin
 
 **Last updated:** 2026-08-10 (ev bilgisayarı)
 **Current step:** 0 — Repo setup ([plan](ROADMAP.md#adım-0--repo-kurulumu))
-**Next sub-step:** 0.5 — `README.md` + `.env.example`
+**Next sub-step:** 0.6 — Adım 0 kapanış commit'i
 
 **Sıradaki oturumda ilk iş:**
 > `git pull`, sonra `uv sync` (ortam `.gitignore`'lu, her makinede yeniden kurulur).
 > `uv run python -c "import lastfm_etl"` sessizce geçmeli.
 >
-> Sonra 0.5: README'nin ön koşul bölümü (`uv` kurulumu) ve `.env.example`.
-> `.env.example` içeriği Adım 1'de hangi env değişkenlerinin gerektiği görüldükten
-> sonra netleşecek — 0.5'te iskeleti kurulur, 1.1'de doldurulur.
+> Sonra 0.6: Adım 0'ın bitti tanımı ([ROADMAP](ROADMAP.md#adım-0--repo-kurulumu))
+> madde madde gözden geçirilecek. Açık kalan tek madde: *"README bir yabancının
+> repoyu klonlayıp çalıştırmasına yetiyor"* — **yabancı testi** henüz yapılmadı
+> (boş klasörde `git clone` → README'yi sıfırdan takip et). Detay: `docs/notes/10` §11.
 
 ---
 
@@ -68,6 +69,19 @@ Kural: bu dosya yalan söyleyebilir (güncellemeyi unutursan). `git log --onelin
       `src\lastfm_etl\__init__.py`, `site-packages` altı değil. Editable install çalışıyor,
       0.3 artık gerçekten kapalı.
       `git status` temiz kaldı: `.venv/` ignore'lu, sadece `uv.lock` yeni dosya olarak çıktı.
+- [x] **0.5** `.env.example` + `README.md`.
+      `.env.example` şimdilik tek anahtar (`LASTFM_API_KEY`, değeri boş). `LASTFM_USER`
+      gibi adaylar bilinçli olarak eklenmedi — config mi CLI argümanı mı olacağı 2.1'in
+      konusu. **Devredilen doğrulama:** `.env.example` ile gerçek `.env` arasındaki
+      anahtar senkronu 1.1'de (gerçek key alınınca) doğrulanacak.
+      README altı bölüm: özet, status, prerequisites, setup, structure, docs haritası.
+      Usage/badge/mimari şeması bilinçli olarak **yok** — çalışan komut yokken yazmak
+      "aspirational README" olurdu. 8.8'de eklenecek. Not: 10.
+- [x] **`check-ignore` tuzağı** (araya giren iş). `git check-ignore -v .env.example`
+      exit `0` döndürdü ve dosya ignore'luymuş gibi göründü — oysa değildi.
+      Sebep: `-v` bayrağı exit code'un anlamını değiştiriyor ("ignore'lu" değil,
+      "bir pattern ile eşleşti" — negation dahil). Doğrulama `git status` /
+      `git add --dry-run` ile yapılır. Not 01'e Tuzak 3 olarak eklendi.
 
 ## Açık sorular
 
