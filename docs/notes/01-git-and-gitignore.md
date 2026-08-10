@@ -1,6 +1,7 @@
 # 01 — Git temelleri ve `.gitignore`
 
-> Adım 0.1 · 2026-08-07 — inline yorum tuzağı ve `check-ignore` bölümü 0.4'te eklendi (2026-08-10)
+> Adım 0.1 · 2026-08-07 — inline yorum tuzağı ve `check-ignore` bölümü 0.4'te eklendi,
+> negation/`-v` tuzağı 0.5'te eklendi (2026-08-10)
 
 ## Neden `.gitignore` ilk iş olarak yazılır
 
@@ -265,13 +266,15 @@ eşleşmediği tahmin değil, çıktıda yazıyor. Toplu doğrulamada `-n` her z
 | `--no-index` | Index'i yok say, sadece pattern'a bak | Aşağıdaki tracked tuzağı |
 | `--stdin` | Yolları satır satır stdin'den oku | Uzun listeler |
 
-Exit code'lar (`-q` ile anlamlı):
+Exit code'lar:
 
 | Kod | Anlamı |
 |---|---|
 | 0 | En az bir yol ignore'lu |
 | 1 | Hiçbiri ignore'lu değil |
 | 128 | Hata (bozuk repo, geçersiz argüman) |
+
+> **Bu tablo `-v` ile geçerli değildir.** Sebebi Tuzak 3'te.
 
 ### Tuzak 1 — takip edilen dosyada sessiz kalır
 
@@ -310,6 +313,69 @@ klasör-kalıbıyla eşleştirmez. Sona `/` koyduğun an eşleşir.
 `.venv/` yerine `.venv/pyvenv.cfg`, `__pycache__/` yerine `src/x/__pycache__/a.pyc`.
 Hem trailing-slash belirsizliğinden kaçarsın, hem gerçek hayattaki soruyu sorarsın —
 `git status`'u kirletecek olan zaten o dosyadır.
+
+### Tuzak 3 — negation (`!`) ve `-v` birlikte yanıltır
+
+0.5'te yaşandı. `.gitignore`'da şu üçlü var:
+
+```
+.env
+.env.*
+!.env.example
+```
+
+`.env.example`'ın gerçekten commit'lenebildiğini doğrulamak için:
+
+```bash
+git check-ignore -v .env.example; echo $?
+```
+```
+.gitignore:24:!.env.example	.env.example
+0
+```
+
+**Çıktı da var, exit code da 0.** İkisi de "ignore'lu" der gibi görünüyor. Oysa dosya
+`git status`'ta görünüyordu — yani ignore'lu **değil**.
+
+#### Barış önce şöyle sandı
+
+*"Çıktı geldiyse ve exit 0 ise dosya ignore'ludur."*
+
+**Aslında `-v` bayrağı exit code'un anlamını değiştiriyor:**
+
+| Komut | 0 ne demek |
+|---|---|
+| `git check-ignore <yol>` | Yol **ignore'lu** |
+| `git check-ignore -v <yol>` | Yol bir pattern ile **eşleşti** — negation dahil |
+
+`!` ile başlayan bir pattern de bir eşleşmedir; verbose mod onu "eşleşme bulundu" sayar.
+Çıktıdaki `!` işareti zaten kararın kendisidir: *"eşleşti, ve karar ignore **etme**"*.
+
+Doğrusu, bayraksız:
+
+```bash
+git check-ignore .env.example; echo $?   # cikti yok, exit=1  -> ignore'lu DEGIL
+git check-ignore .venv/pyvenv.cfg; echo $?  # yolu basar, exit=0  -> ignore'lu
+```
+
+#### Genel ders
+
+Bu, Tuzak 1'in aynı ailesinden: **`check-ignore` bir teşhis aracıdır, doğrulama aracı
+değil.** Cevapladığı soru "bu yola karar veren pattern hangisi", "bu dosya commit'lenir
+mi" değil.
+
+Commit'lenip commit'lenmeyeceğini soruyorsan git'in gerçek davranışına bak:
+
+```bash
+git status                 # gorunuyor mu
+git add -n .env.example    # dry-run: "add '.env.example'" derse ignore'lu degil
+```
+
+Bir aracın özet raporuna değil, aracın gerçekte ne yaptığına bakmak — bu notun en
+başındaki inline-yorum dersinin aynısı. Orada da doğrulama **örnek** üzerinden yapılmıştı
+ve pattern'ların yarısının bozuk olduğu 0.4'e kadar fark edilmemişti.
+
+> **Kural:** `check-ignore` → "neden?" · `status` / `add --dry-run` → "gerçekten mi?"
 
 ### Tersten doğrulama: `check-ignore` yerine `status`
 
