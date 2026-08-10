@@ -1,6 +1,6 @@
 # 01 — Git temelleri ve `.gitignore`
 
-> Adım 0.1 · 2026-08-07
+> Adım 0.1 · 2026-08-07 — inline yorum tuzağı ve `check-ignore` bölümü 0.4'te eklendi (2026-08-10)
 
 ## Neden `.gitignore` ilk iş olarak yazılır
 
@@ -47,6 +47,61 @@ push'larsın, CI'da `ModuleNotFoundError` alırsın. Bu "sessiz başarısızlık
 | `*.py[cod]` | Glob character class — `.pyc`, `.pyo`, `.pyd` üçünü birden yakalar |
 | `!kalıp` | Negation: "bunu ignore'dan muaf tut" |
 | `**` | Herhangi sayıda ara klasör (`data/**` = data içindeki her şey) |
+
+## Inline yorum tuzağı
+
+**Barış önce şöyle sandı:** `.gitignore` de kod gibidir, satır sonuna yorum yazılabilir.
+
+```gitignore
+__pycache__/          # compiled bytecode, regenerated on every run
+.venv/                # machine-specific
+```
+
+**Aslında:** `.gitignore` **satır sonu (inline) yorumu desteklemez.** Git yalnızca `#`
+ile **başlayan** satırı yorum sayar. Yukarıdaki satırlarda pattern, `#` dahil satırın
+tamamıdır:
+
+```
+__pycache__/          # compiled bytecode, regenerated on every run
+```
+
+Böyle bir isimde dosya olmadığı için **hiçbir şey ignore edilmez.** Hata mesajı yok,
+uyarı yok — dosya sessizce çalışmaz.
+
+Doğrusu, yorumu kendi satırına almak:
+
+```gitignore
+# compiled bytecode, regenerated on every run
+__pycache__/
+```
+
+### Bu tuzak 0.4'e kadar neden fark edilmedi
+
+0.1'de `git check-ignore -v` ile doğrulama yapıldı — ama `.env` ve `data/` üzerinden.
+O iki satırda inline yorum yoktu, dolayısıyla test yeşil geçti. Ortam kurulup `.venv/`
+diske düştüğünde `git status` üç kirli girdi gösterdi:
+
+```
+?? .venv/
+?? lastfm_etl.egg-info/
+?? src/            <- icindeki __pycache__ yuzunden
+```
+
+**Genel ders — bu, notun sonundaki "cache vs gerçek" dersinin kardeşi:**
+doğrulamayı **örnek** üzerinden yaptın, **kalıp** üzerinden değil. İki dosya test edip
+"ignore çalışıyor" sonucuna varmak, test edilmemiş satırların çalıştığını **varsaymak**tır.
+Doğru test: her pattern için en az bir yol.
+
+### İlgili syntax detayları
+
+| Durum | Davranış |
+|---|---|
+| Satır sonundaki boşluklar | Git tarafından yok sayılır (`\ ` ile escape edilmedikçe) |
+| `#` ile **başlayan** satır | Yorum |
+| `#` satırın **ortasında** | Pattern'ın parçası — yorum değil |
+| Adı gerçekten `#` ile başlayan dosya | `\#dosya` diye escape et |
+| Adı gerçekten `!` ile başlayan dosya | `\!dosya` diye escape et |
+| Boş satır | Hiçbir şeyle eşleşmez; sadece okunabilirlik için |
 
 ## Negation (`!`) ve sıra
 
@@ -133,20 +188,115 @@ git config --global core.excludesfile ~/.gitignore_global
 
 Karşı görüş: `.vscode/settings.json`'ı takım standardı olarak commit'leyen ekipler var.
 
-## Doğrulama komutu
+## `git check-ignore` — doğrulama komutu
+
+`.gitignore` yazmak yarısı; **yazdığının çalıştığını kanıtlamak** diğer yarısı.
+`.gitignore`'ın hata mesajı yoktur — yanlış yazılmış bir satır patlamaz, sadece
+hiçbir şey yapmaz. Bu yüzden doğrulama isteğe bağlı bir titizlik değil, adımın parçası.
+
+### Ne zaman çalıştırılır
+
+| An | Neden |
+|---|---|
+| `.gitignore`'a her yeni satır eklendiğinde | Yeni satır test edilmemiş satırdır |
+| Yeni bir araç projeye girdiğinde (venv, pytest, mypy, ruff, Docker) | Her araç kendi çöpünü üretir |
+| `git status`'ta beklemediğin bir şey göründüğünde | Teşhis aracı |
+| Bir dosya `git status`'ta **görünmesi gerekirken görünmediğinde** | Asıl tehlikeli yön — sessizce ignore'lanan kaynak dosya |
+| İlk commit'ten önce | En ucuz an |
+
+### Nasıl yazılır
 
 ```bash
 git check-ignore -v <path> [<path> ...]
 ```
 
-Hangi **satırın** hangi dosyayı ignore ettiğini gösterir. Sadece ignore edilen yollar
-çıktıda görünür.
+Yollar diskte var olmak **zorunda değil** — git string üzerinden pattern eşleştirir.
+Yani `.venv/` daha oluşmadan da test edebilirsin. (Tek istisna aşağıdaki trailing-slash
+kuralı.)
 
-### Sürpriz davranış
+### Çıktı nasıl okunur
+
+Çıktı formatı — ayraçlar önemli, aralarındaki **TAB**'a dikkat:
+
+```
+<kaynak>:<satır no>:<pattern>	<sorulan yol>
+```
+
+```
+.gitignore:11:.venv/	.venv/pyvenv.cfg
+└── kaynak    └── pattern   └── senin sorduğun yol
+      └── satır no
+```
+
+Okunuşu: *".venv/pyvenv.cfg yolu, `.gitignore` dosyasının 11. satırındaki `.venv/`
+pattern'ı yüzünden ignore ediliyor."*
+
+**Püf noktası:** en değerli sütun **satır numarası**. Ignore'ın hangi satırdan geldiğini
+söyler — birden fazla pattern aynı yolu yakalayabilir ve `!` negation'ları yüzünden
+**son eşleşen kazanır**. `check-ignore` sana kazananı gösterir, hepsini değil.
+
+### En sık yapılan yanlış okuma
+
+**Çıktı yoksa "sorun yok" demek değildir — "ignore edilmiyor" demektir.**
+
+`check-ignore` sadece **eşleşen** yolları basar. Beş yol sorup üç satır çıktı aldıysan,
+iki yol ignore edilmiyor demektir ve hangileri olduğunu göz kararı bulman gerekir.
+Bunu `-n` çözer:
+
+```bash
+git check-ignore -v -n .venv/pyvenv.cfg src/lastfm_etl/__init__.py
+```
+
+```
+.gitignore:11:.venv/	.venv/pyvenv.cfg
+::	src/lastfm_etl/__init__.py
+```
+
+`::` = boş kaynak, boş satır no, boş pattern → **eşleşme yok**. Artık hangi yolun
+eşleşmediği tahmin değil, çıktıda yazıyor. Toplu doğrulamada `-n` her zaman kullanılmalı.
+
+### Diğer bayraklar
+
+| Bayrak | Ne yapar | Ne zaman |
+|---|---|---|
+| `-v` | Eşleşen kaynağı/satırı/pattern'ı göster | Neredeyse her zaman |
+| `-n` | Eşleşmeyenleri de listele (`-v` ile) | Birden fazla yol sorarken |
+| `-q` | Çıktı basma, sadece exit code | Script ve CI |
+| `--no-index` | Index'i yok say, sadece pattern'a bak | Aşağıdaki tracked tuzağı |
+| `--stdin` | Yolları satır satır stdin'den oku | Uzun listeler |
+
+Exit code'lar (`-q` ile anlamlı):
+
+| Kod | Anlamı |
+|---|---|
+| 0 | En az bir yol ignore'lu |
+| 1 | Hiçbiri ignore'lu değil |
+| 128 | Hata (bozuk repo, geçersiz argüman) |
+
+### Tuzak 1 — takip edilen dosyada sessiz kalır
+
+`check-ignore` varsayılan olarak **index'e de bakar**. Bir dosya zaten tracked ise,
+pattern onu birebir yakalıyor olsa bile çıktı **boş** döner:
+
+```bash
+git add -f app.log
+git check-ignore -v app.log             # cikti yok, exit=1
+git check-ignore -v --no-index app.log  # .gitignore:1:*.log	app.log
+```
+
+Mantığı doğru: tracked dosya gerçekten ignore edilmiyor — `.gitignore` yalnızca
+**untracked** dosyaları etkiler (notun başındaki kural). Ama teşhis sırasında yanıltır:
+"pattern'ım yanlış" dersin, oysa pattern doğru, dosya sadece geçmişte `git add`
+edilmiştir. <span style="color:#FFD600">**Çözüm `git rm --cached <path>`, pattern'ı değiştirmek değil.**</span> 
+
+**Kural: "pattern doğru mu?" sorusunda `--no-index`, "bu dosya şu an ignore'lu mu?"
+sorusunda bayraksız kullan.** İki farklı soru.
+
+### Tuzak 2 — trailing slash
 
 ```bash
 git check-ignore -v __pycache__      # eşleşme YOK
-git check-ignore -v __pycache__/     # .gitignore:1:__pycache__/
+git check-ignore -v __pycache__/     # .gitignore:3:__pycache__/
 git check-ignore -v src/__pycache__  # eşleşir (klasör diskte varsa)
 ```
 
@@ -155,6 +305,28 @@ Sebep: `__pycache__/` kalıbındaki sondaki `/` "sadece klasör" demek. Diskte o
 klasör-kalıbıyla eşleştirmez. Sona `/` koyduğun an eşleşir.
 
 `data/raw` eşleşir çünkü içinde `/` var — git `data`'nın klasör olduğunu string'den anlar.
+
+**Pratik kural: klasör pattern'larını test ederken içindeki gerçek bir dosyayı sor.**
+`.venv/` yerine `.venv/pyvenv.cfg`, `__pycache__/` yerine `src/x/__pycache__/a.pyc`.
+Hem trailing-slash belirsizliğinden kaçarsın, hem gerçek hayattaki soruyu sorarsın —
+`git status`'u kirletecek olan zaten o dosyadır.
+
+### Tersten doğrulama: `check-ignore` yerine `status`
+
+`check-ignore` "bu yolu ignore ediyor muyum?" sorusunu cevaplar — yani **ne soracağını
+bilmen gerekir.** Aklına gelmeyen dosyayı test edemezsin. Tersten bakan iki komut:
+
+```bash
+git status --short --ignored   # ignore'lular "!!" ile listelenir
+git status --short             # kirli olan ne varsa
+```
+
+`--ignored`, `.gitignore`'ın gerçekten neyi yuttuğunu gösterir. Bir kaynak dosyanın
+oraya düştüğünü görürsen, pattern'ın fazla geniş demektir — notun başındaki
+`raw` vs `raw/` tuzağının yakalandığı yer burasıdır.
+
+**İkisi birlikte kullanılır:** `check-ignore` yazdığın satırı doğrular (ileriye doğru),
+`status --ignored` yazmadığın satırın yan etkisini gösterir (geriye doğru).
 
 ## Bonus: `git status` "M" diyor ama `git diff` boş
 

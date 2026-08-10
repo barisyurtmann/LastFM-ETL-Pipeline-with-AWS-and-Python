@@ -21,6 +21,7 @@ Testi tek soru: **"Bu bilgi başka bir projede de geçerli mi?"**
 | [04](04-src-layout-and-syspath.md) | `src/` layout ve `sys.path` | 0.3 |
 | [05](05-toml-and-pyproject.md) | TOML formatı ve `pyproject.toml` anatomisi | 0.3 |
 | [06](06-modules-packages-and-init.md) | Modül, paket, `__init__.py` ve isimlendirme | 0.3 |
+| [07](07-staging-area-and-atomic-commits.md) | Staging area, `git diff --staged`, atomik commit | 0.4 |
 
 ---
 
