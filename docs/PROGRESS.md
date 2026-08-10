@@ -12,17 +12,37 @@ Kural: bu dosya yalan söyleyebilir (güncellemeyi unutursan). `git log --onelin
 ---
 
 **Last updated:** 2026-08-10 (ev bilgisayarı)
-**Current step:** 0 — Repo setup ([plan](ROADMAP.md#adım-0--repo-kurulumu))
-**Next sub-step:** 0.6 — Adım 0 kapanış commit'i
+**Current step:** 1 — Veriyi tanı ([plan](ROADMAP.md#adım-1--veriyi-tanı))
+**Next sub-step:** 1.1 — Last.fm API key al, `.env`'e koy
 
-**Sıradaki oturumda ilk iş:**
-> `git pull`, sonra `uv sync` (ortam `.gitignore`'lu, her makinede yeniden kurulur).
-> `uv run python -c "import lastfm_etl"` sessizce geçmeli.
+> **ADIM 0 TAMAMLANDI.** Bitti tanımının beş maddesi de doğrulandı (aşağıda).
+
+**Sıradaki oturumda ilk iş — iş bilgisayarı:**
+
+> **1. `git pull`** (bu makinede birkaç commit bekliyor).
 >
-> Sonra 0.6: Adım 0'ın bitti tanımı ([ROADMAP](ROADMAP.md#adım-0--repo-kurulumu))
-> madde madde gözden geçirilecek. Açık kalan tek madde: *"README bir yabancının
-> repoyu klonlayıp çalıştırmasına yetiyor"* — **yabancı testi** henüz yapılmadı
-> (boş klasörde `git clone` → README'yi sıfırdan takip et). Detay: `docs/notes/10` §11.
+> **2. `uv` bu makinede KURULU DEĞİL.** Önce kur, sonra terminali kapat-aç:
+> ```
+> winget install --id=astral-sh.uv -e
+> uv --version
+> ```
+> `command not found` alırsan `PATH` henüz yenilenmemiştir; terminal yeniden açılmalı.
+> Teşhis: `which uv`. Detay: `docs/notes/09` §2 ve §7.
+>
+> **3. `uv sync`** → `.venv/` + bağımlılıklar. `.venv/` git'e girmez, her makinede
+> yeniden kurulur.
+>
+> **4. Doğrulama:** `uv run python -c "import lastfm_etl; print('ok')"`
+> Ayrıca `git status` **temiz** olmalı.
+>
+> **5. Sonra 1.1'e geçilir.** Adım 1'in çıktısı kod değil — **bilgi ve bir örnek
+> dosya**. Amaç: tek satır pipeline kodu yazmadan gerçek payload'ı elle görmek.
+> Şema, grain ve partition kararları buna dayanacak.
+
+**1.1'de bekleyen devredilmiş doğrulama:** `.env.example` ile gerçek `.env` arasındaki
+anahtar listesi birebir aynı mı — 0.5'te `.env` henüz yokken doğrulanamamıştı.
+Gerçek key `.env`'e girdiğinde `git status`'un onu **göstermediği** de teyit edilmeli
+(0.5'te boş dosyayla test edildi, gerçek sırla değil).
 
 ---
 
@@ -82,6 +102,15 @@ Kural: bu dosya yalan söyleyebilir (güncellemeyi unutursan). `git log --onelin
       Sebep: `-v` bayrağı exit code'un anlamını değiştiriyor ("ignore'lu" değil,
       "bir pattern ile eşleşti" — negation dahil). Doğrulama `git status` /
       `git add --dry-run` ile yapılır. Not 01'e Tuzak 3 olarak eklendi.
+- [x] **0.6 — ADIM 0 KAPANDI.** Bitti tanımının beş maddesi:
+
+      | Madde | Nasıl doğrulandı |
+      |---|---|
+      | `git status` temiz, türev dosya yok | `.venv/`, `*.egg-info/`, `uv.lock` sonrası temiz |
+      | `.env` ve `data/` gerçekten ignore'lu | `git check-ignore` + `git status` (boş `.env` ile) |
+      | Paket temiz ortamda kurulup import edilebiliyor | `uv run python -c "import lastfm_etl"` → `src/` yolu |
+      | `.env.example` var, gerçek `.env` yok | Doğrulandı; **anahtar senkronu 1.1'e devredildi** |
+      | README bir yabancıya yetiyor | Boş klasörde `git clone` + README'yi sıfırdan takip — geçti |
 
 ## Açık sorular
 
@@ -107,3 +136,6 @@ Kural: bu dosya yalan söyleyebilir (güncellemeyi unutursan). `git log --onelin
 - Oturuma `git pull` ile başla, `git push` ile bitir. İki makinede çalışılıyor.
 - İş makinesinde ilk `git pull`'dan sonra `git status` **temiz** olmalı. Kirliyse
   `.gitattributes` orada uygulanmamış demektir — `git ls-files --eol` ile bak.
+- **İş makinesinde `uv` kurulu değil.** Ortam kurulmadan hiçbir şey çalışmaz.
+- Adım 1 kod adımı **değil**. Çıktısı: kaydedilmiş gerçek payload + hata payload'ı +
+  grain cümlesi + hedef şema tablosu. Kod yazma isteği gelirse Adım 3'e ait demektir.
