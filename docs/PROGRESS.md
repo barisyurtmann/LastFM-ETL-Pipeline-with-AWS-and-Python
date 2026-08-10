@@ -11,30 +11,17 @@ Kural: bu dosya yalan söyleyebilir (güncellemeyi unutursan). `git log --onelin
 
 ---
 
-**Last updated:** 2026-08-10 (iş bilgisayarı)
+**Last updated:** 2026-08-10 (ev bilgisayarı)
 **Current step:** 0 — Repo setup ([plan](ROADMAP.md#adım-0--repo-kurulumu))
-**Next sub-step:** 0.4 — Sanal ortam. **Karar verildi (uv), uygulanmadı.**
+**Next sub-step:** 0.5 — `README.md` + `.env.example`
 
-**Sıradaki oturumda ilk iş — ev bilgisayarı:**
-> `git pull` (3 commit bekliyor), sonra sırayla:
+**Sıradaki oturumda ilk iş:**
+> `git pull`, sonra `uv sync` (ortam `.gitignore`'lu, her makinede yeniden kurulur).
+> `uv run python -c "import lastfm_etl"` sessizce geçmeli.
 >
-> 1. **Gözlem — 5 dakika, commit yok.** `python -m venv .venv-test` çalıştır,
->    `.venv-test/pyvenv.cfg` dosyasını aç ve oku (`home`, `include-system-site-packages`),
->    `.venv-test/Scripts/` içine bak. Sonra klasörü sil. Amaç: `uv`'nin senin yerine
->    ne ürettiğini önce elle görmek. Detay: `docs/notes/08-virtual-environments-and-uv.md` §2
-> 2. `uv` kurulumu (Windows: `winget install --id=astral-sh.uv` veya resmî installer).
->    `uv --version` ile doğrula
-> 3. `uv venv` → `.venv/` oluşacak
-> 4. `git status` **temiz kalmalı**. Kirliyse `.gitignore` düzeltmesi (`6c778fc`) o makinede
->    uygulanmamış demektir
-> 5. `uv pip install -e .`
-> 6. **0.3'ün devredilmiş doğrulaması:**
->    `uv run python -c "import lastfm_etl; print(lastfm_etl.__file__)"`
->    Çıktı `src/lastfm_etl/__init__.py` yolunu göstermeli — `site-packages` altını
->    **değil**. Gösterirse editable install çalışmamış demektir.
->    Bu çalışmadan 0.3 gerçekten bitmiş sayılmaz.
->
-> Sonra `uv.lock` üretimi ve 0.4 kapanış commit'i konuşulacak.
+> Sonra 0.5: README'nin ön koşul bölümü (`uv` kurulumu) ve `.env.example`.
+> `.env.example` içeriği Adım 1'de hangi env değişkenlerinin gerektiği görüldükten
+> sonra netleşecek — 0.5'te iskeleti kurulur, 1.1'de doldurulur.
 
 ---
 
@@ -71,15 +58,27 @@ Kural: bu dosya yalan söyleyebilir (güncellemeyi unutursan). `git log --onelin
       Python sürüm yönetimini tek araçta veriyor. "Önce venv+pip, sonra uv" alternatifi
       reddedildi — üç araç öğrenmek demek olurdu ve `uv` zaten `.venv/`/`pyvenv.cfg`/
       `PATH` mekanizmasını gizlemiyor. Notlar: 07, 08.
-      **Karar verildi ama uygulanmadı** — kurulum ev makinesinde yapılacak.
+- [x] **0.4** Sanal ortam kuruldu. `uv` 0.12.2 (winget), `uv sync` → `.venv/` + `uv.lock`.
+      **PROGRESS ile ADR-0003 çelişkisi düzeltildi:** buradaki eski sıra
+      `uv venv` → `uv pip install -e .` idi; bu **pip mode**'dur ve `uv.lock`'a bakmaz,
+      yani ADR'de reddedilen modelin komutlarıydı. Project mode'da doğru komut tek:
+      `uv sync`. Not: 09.
+      **0.3'ün devredilmiş doğrulaması geçti** —
+      `uv run python -c "import lastfm_etl; print(lastfm_etl.__file__)"` çıktısı
+      `src\lastfm_etl\__init__.py`, `site-packages` altı değil. Editable install çalışıyor,
+      0.3 artık gerçekten kapalı.
+      `git status` temiz kaldı: `.venv/` ignore'lu, sadece `uv.lock` yeni dosya olarak çıktı.
 
 ## Açık sorular
 
 - Build backend `setuptools` seçildi; `uv` bir build backend değil (resolver + paket
   yöneticisi), dolayısıyla ADR-0003 bu kararı değiştirmiyor. `hatchling` alternatifi
   açık kalmaya devam ediyor; değişirse ADR yazılır.
-- `uv.lock` üretimi 0.4'ün son parçası. `dependencies = []` iken lock dosyasının anlamı
-  ne olur — ev oturumunda konuşulacak.
+- `.python-version` yok. `requires-python = ">=3.11"` bir aralık — iki makinede farklı
+  yorumlayıcı seçilebilir (ev: 3.14.5). Sapma görülürse `uv python install` +
+  `.python-version` ile sabitlenecek. Şimdilik bilinçli olarak eklenmedi.
+- Adım 8.5'te CI'da `uv`'nin **kendi sürümü** sabitlenecek. Bağımlılıkları kilitleyip
+  aracı kilitlememek, "kendiliğinden bozulan build" riskini açık bırakır.
 
 ## Git geçmişinde görünmeyen kararlar
 
