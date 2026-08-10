@@ -11,14 +11,15 @@ Kural: bu dosya yalan söyleyebilir (güncellemeyi unutursan). `git log --onelin
 
 ---
 
-**Last updated:** 2026-08-09 (ev bilgisayarı)
+**Last updated:** 2026-08-10 (iş bilgisayarı)
 **Current step:** 0 — Repo setup ([plan](ROADMAP.md#adım-0--repo-kurulumu))
-**Next sub-step:** 0.3 — `pyproject.toml` + `src/` layout
+**Next sub-step:** 0.4 — Sanal ortam (`uv` / `venv`)
 
-**Sıradaki oturumda cevaplanacak açık soru:**
-> Kodu neden `src/` klasörünün içine koyuyoruz? Repo kökünde `lastfm_etl/` olsa ne
-> değişirdi — somut teknik bir sonucu var mı, yoksa sadece düzen meselesi mi?
-> (Barış bu soruya cevap vermeden 0.3 anlatılmaya başlanmayacak.)
+**Sıradaki oturumda ilk iş:**
+> 0.3'ün doğrulaması 0.4'e devredildi. Sanal ortam kurulur kurulmaz
+> `pip install -e .` ve ardından `python -c "import lastfm_etl; print(lastfm_etl.__file__)"`
+> çalıştırılacak. Çıktı `src/lastfm_etl/__init__.py` yolunu göstermeli.
+> Bu çalışmadan 0.3 gerçekten bitmiş sayılmaz.
 
 ---
 
@@ -35,11 +36,19 @@ Kural: bu dosya yalan söyleyebilir (güncellemeyi unutursan). `git log --onelin
       Semptom: içerik değişmeden `1127 insertions / 1127 deletions`. Sebep: iş
       makinesi tüm docs'u CRLF ile yeniden yazmıştı.
       `git ls-files --eol` ile `i/lf w/lf` doğrulandı. Not: `docs/notes/03-line-endings.md`
+- [x] **0.3** `pyproject.toml` + `src/` layout.
+      Paket adı kararı: dağıtım `lastfm-etl`, import `lastfm_etl`. Önceki
+      `src/lastfm-pipeline/` klasörü silindi — tire içeren isim `SyntaxError` verir,
+      import edilemez. Boş alt klasörler (`extract/`, `transform/`, `load/`, `utils/`)
+      açılmadı: modül yapısı Adım 1'de gerçek payload görüldükten sonra kararlaşacak.
+      ADR-0002 yazıldı. Notlar: 04, 05, 06.
+      **Uyarı:** kurulabilirlik doğrulanmadı — venv 0.4'te geliyor.
 
 ## Açık sorular
 
 - `uv` mi `venv` + `pip` mi? — 0.4'te karara bağlanacak, ADR yazılacak.
-- Paket adı ne olacak (`lastfm_etl`?) — 0.3'te karara bağlanacak.
+- Build backend `setuptools` seçildi; `hatchling` alternatifi 0.4'te uv kararıyla
+  birlikte yeniden gözden geçirilebilir. Değişirse ADR yazılır.
 
 ## Git geçmişinde görünmeyen kararlar
 

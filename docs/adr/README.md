@@ -61,3 +61,4 @@ only upsides was not a real decision.
 | # | Title | Status |
 |---|---|---|
 | [0001](0001-record-architecture-decisions.md) | Record architecture decisions | Accepted |
+| [0002](0002-use-src-layout.md) | Use a src layout for the package | Accepted |
