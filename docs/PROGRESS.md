@@ -13,13 +13,28 @@ Kural: bu dosya yalan söyleyebilir (güncellemeyi unutursan). `git log --onelin
 
 **Last updated:** 2026-08-10 (iş bilgisayarı)
 **Current step:** 0 — Repo setup ([plan](ROADMAP.md#adım-0--repo-kurulumu))
-**Next sub-step:** 0.4 — Sanal ortam (`uv` / `venv`)
+**Next sub-step:** 0.4 — Sanal ortam. **Karar verildi (uv), uygulanmadı.**
 
-**Sıradaki oturumda ilk iş:**
-> 0.3'ün doğrulaması 0.4'e devredildi. Sanal ortam kurulur kurulmaz
-> `pip install -e .` ve ardından `python -c "import lastfm_etl; print(lastfm_etl.__file__)"`
-> çalıştırılacak. Çıktı `src/lastfm_etl/__init__.py` yolunu göstermeli.
-> Bu çalışmadan 0.3 gerçekten bitmiş sayılmaz.
+**Sıradaki oturumda ilk iş — ev bilgisayarı:**
+> `git pull` (3 commit bekliyor), sonra sırayla:
+>
+> 1. **Gözlem — 5 dakika, commit yok.** `python -m venv .venv-test` çalıştır,
+>    `.venv-test/pyvenv.cfg` dosyasını aç ve oku (`home`, `include-system-site-packages`),
+>    `.venv-test/Scripts/` içine bak. Sonra klasörü sil. Amaç: `uv`'nin senin yerine
+>    ne ürettiğini önce elle görmek. Detay: `docs/notes/08-virtual-environments-and-uv.md` §2
+> 2. `uv` kurulumu (Windows: `winget install --id=astral-sh.uv` veya resmî installer).
+>    `uv --version` ile doğrula
+> 3. `uv venv` → `.venv/` oluşacak
+> 4. `git status` **temiz kalmalı**. Kirliyse `.gitignore` düzeltmesi (`6c778fc`) o makinede
+>    uygulanmamış demektir
+> 5. `uv pip install -e .`
+> 6. **0.3'ün devredilmiş doğrulaması:**
+>    `uv run python -c "import lastfm_etl; print(lastfm_etl.__file__)"`
+>    Çıktı `src/lastfm_etl/__init__.py` yolunu göstermeli — `site-packages` altını
+>    **değil**. Gösterirse editable install çalışmamış demektir.
+>    Bu çalışmadan 0.3 gerçekten bitmiş sayılmaz.
+>
+> Sonra `uv.lock` üretimi ve 0.4 kapanış commit'i konuşulacak.
 
 ---
 
@@ -43,12 +58,28 @@ Kural: bu dosya yalan söyleyebilir (güncellemeyi unutursan). `git log --onelin
       açılmadı: modül yapısı Adım 1'de gerçek payload görüldükten sonra kararlaşacak.
       ADR-0002 yazıldı. Notlar: 04, 05, 06.
       **Uyarı:** kurulabilirlik doğrulanmadı — venv 0.4'te geliyor.
+- [x] **`.gitignore` düzeltmesi** (ROADMAP'te yazmayan, araya giren iş).
+      `.gitignore` **satır sonu yorumu desteklemez** — sadece `#` ile *başlayan* satır
+      yorumdur. `__pycache__/`, `*.py[cod]`, `*.egg-info/` ve `.venv/` pattern'ları
+      yorum metnini de içerdiği için **hiçbir şeyle eşleşmiyordu**.
+      `fix: correct .gitignore patterns broken by inline comments`
+      0.1'deki doğrulama `.env` ve `data/` üzerinden yapıldığı için (o satırlarda inline
+      yorum yok) fark edilmemişti. Ders: doğrulama **örnek** üzerinden değil, **her
+      pattern** üzerinden yapılır. Not: `docs/notes/01`.
+- [x] **0.4 kararı:** `uv`, project mode. ADR-0003 yazıldı.
+      Gerekçe özeti: 8.6 zaten lock dosyası istiyor; `uv` onu, dev/prod ayrımını ve
+      Python sürüm yönetimini tek araçta veriyor. "Önce venv+pip, sonra uv" alternatifi
+      reddedildi — üç araç öğrenmek demek olurdu ve `uv` zaten `.venv/`/`pyvenv.cfg`/
+      `PATH` mekanizmasını gizlemiyor. Notlar: 07, 08.
+      **Karar verildi ama uygulanmadı** — kurulum ev makinesinde yapılacak.
 
 ## Açık sorular
 
-- `uv` mi `venv` + `pip` mi? — 0.4'te karara bağlanacak, ADR yazılacak.
-- Build backend `setuptools` seçildi; `hatchling` alternatifi 0.4'te uv kararıyla
-  birlikte yeniden gözden geçirilebilir. Değişirse ADR yazılır.
+- Build backend `setuptools` seçildi; `uv` bir build backend değil (resolver + paket
+  yöneticisi), dolayısıyla ADR-0003 bu kararı değiştirmiyor. `hatchling` alternatifi
+  açık kalmaya devam ediyor; değişirse ADR yazılır.
+- `uv.lock` üretimi 0.4'ün son parçası. `dependencies = []` iken lock dosyasının anlamı
+  ne olur — ev oturumunda konuşulacak.
 
 ## Git geçmişinde görünmeyen kararlar
 
