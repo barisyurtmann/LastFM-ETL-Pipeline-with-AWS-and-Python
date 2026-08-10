@@ -1,10 +1,14 @@
 # --- Python build artifacts ---
-__pycache__/          # compiled bytecode, regenerated on every run
-*.py[cod]             # matches .pyc, .pyo, .pyd
-*.egg-info/           # package metadata produced by an editable install
+# compiled bytecode, regenerated on every run
+__pycache__/   
+# matches .pyc, .pyo, .pyd       
+*.py[cod]      
+# package metadata produced by an editable install       
+*.egg-info/           
 
 # --- Virtual environment ---
-.venv/                # machine-specific; recreated from pyproject.toml
+# machine-specific; recreated from pyproject.toml
+.venv/                
 
 # --- Tooling caches ---
 .pytest_cache/
