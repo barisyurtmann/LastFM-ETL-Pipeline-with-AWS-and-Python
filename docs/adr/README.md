@@ -62,3 +62,4 @@ only upsides was not a real decision.
 |---|---|---|
 | [0001](0001-record-architecture-decisions.md) | Record architecture decisions | Accepted |
 | [0002](0002-use-src-layout.md) | Use a src layout for the package | Accepted |
+| [0003](0003-use-uv-for-environment-and-dependency-management.md) | Use uv for environment and dependency management | Accepted |
