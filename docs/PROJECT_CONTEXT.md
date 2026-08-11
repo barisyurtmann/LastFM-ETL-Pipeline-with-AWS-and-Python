@@ -103,11 +103,17 @@ klasör yapısı değil.
 
 ### İşe yarar metodlar
 
+- **`chart.getTopTracks` — global en popüler parçalar. İlk dilimin metodu (1.4'te seçildi).**
 - `chart.getTopArtists` — global en popüler sanatçılar
-- `chart.getTopTracks` — global en popüler parçalar
 - `artist.getTopTracks` — bir sanatçının en popüler parçaları
 - `geo.getTopArtists` — ülke bazlı (`country=turkey`)
 - `tag.getTopTracks` — tür/etiket bazlı
+
+**Neden `chart.getTopTracks`:** `getTopArtists` düz bir tablo döndürür — transform katmanı
+`DataFrame(data)` çağrısına indirgenir ve öğrenilecek bir şey kalmaz. `getTopTracks` iç içe
+bir `artist` nesnesi, `duration` gibi sayısal bir alan ve aynı isimli alanın metoda göre
+farklı tip alması gibi gerçek dönüşüm problemleri taşır. Seçim satır sayısı için değil,
+**şema derinliği** için yapıldı — satır sayısı zaten `limit` parametresine bağlı.
 
 ### Rate limit
 
@@ -124,13 +130,13 @@ Last.fm API
 [EXTRACT]  api client → ham JSON, hiç dokunulmadan
     │
     ▼
-raw/ ── s3://bucket/raw/lastfm/method=chart_gettopartists/dt=2026-08-07/data.json
+raw/ ── s3://bucket/raw/lastfm/method=chart_gettoptracks/dt=2026-08-07/data.json
     │      (immutable — bir kez yazılır, asla değiştirilmez)
     ▼
 [TRANSFORM]  şema doğrulama → düzleştirme → tip dönüşümü
     │
     ▼
-curated/ ── s3://bucket/curated/top_artists/dt=2026-08-07/part-0.parquet
+curated/ ── s3://bucket/curated/top_tracks/dt=2026-08-07/part-0.parquet
     │
     ▼
 [LOAD]  Glue Crawler → Data Catalog → Athena ile SQL

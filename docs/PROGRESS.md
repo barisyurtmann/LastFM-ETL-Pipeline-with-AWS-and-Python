@@ -13,15 +13,15 @@ Kural: bu dosya yalan söyleyebilir (güncellemeyi unutursan). `git log --onelin
 
 **Last updated:** 2026-08-11 (iş bilgisayarı)
 **Current step:** 1 — Veriyi tanı ([plan](ROADMAP.md#adım-1--veriyi-tanı))
-**Next sub-step:** 1.4 — Gerçek payload'ı diske kaydet (konum kararı: `tests/fixtures/` mi `docs/samples/` mi)
+**Next sub-step:** 1.5 — Payload anatomisi: alan listesi, tipler, null'lar, iç içelik
 
 > **ADIM 0 TAMAMLANDI.** Bitti tanımının beş maddesi de doğrulandı (aşağıda).
-> **1.1, 1.2, 1.3 TAMAMLANDI.**
+> **1.1, 1.2, 1.3, 1.4 TAMAMLANDI.**
 
-**1.4'e taşınan malzeme:** kaydedilecek üç payload hazır — başarı (`chart.getTopArtists`),
-hata `error 10` (bozuk key, 403), hata `error 3` (bozuk metod, 400). ROADMAP'in açık
-sorusu 1.4'te karara bağlanacak: aynı dosya hem insan (doküman) hem test (fixture)
-tarafından okunacak, iki kopya tutmak sapma demektir.
+**1.5'in girdisi hazır:** `tests/fixtures/lastfm/chart_gettoptracks_success.json` (20 parça).
+İlk bakışta göze çarpanlar — 1.5'te tek tek incelenecek: tüm sayılar **string** geliyor
+(`"duration": "184"`), `artist` ve `streamable` **iç içe nesne**, `image` dört elemanlı
+dizi, ve anahtar adlarında `#text` gibi **XML kalıntıları** var.
 
 **Adım 1 hatırlatması:** bu adımın çıktısı kod değil, **bilgi ve örnek dosya**. Kod yazma
 isteği gelirse Adım 3'e aittir.
@@ -149,6 +149,37 @@ isteği gelirse Adım 3'e aittir.
       **ADR adayı düzeltmesi:** ROADMAP'te 3.3 için yazan
       *"Treat HTTP 200 with an error body as a failure"* başlığı ölçüme uymuyor;
       ADR yazılırken *"Validate both HTTP status and response body"* olacak.
+
+- [x] **METOD DEĞİŞİKLİĞİ (1.4'te alındı):** ilk dilim `chart.getTopArtists` yerine
+      **`chart.getTopTracks`** ile yapılacak. Gerekçe satır sayısı **değil** (o `limit`
+      parametresine bağlı), **şema derinliği**: `getTopTracks` iç içe `artist` nesnesi,
+      `duration` gibi sayısal alan ve `streamable`'ın metoda göre farklı tip alması gibi
+      gerçek dönüşüm problemleri taşıyor. `getTopArtists` düz bir tablo — transform katmanı
+      tek satıra inerdi ve 5.4 (düzleştirme) öğrenilmeden geçilirdi.
+      `PROJECT_CONTEXT.md` §3 ve §4 buna göre güncellendi.
+- [x] **1.4** Üç payload `tests/fixtures/lastfm/` altına kaydedildi:
+      `chart_gettoptracks_success.json` (31 KB, 20 parça), `error_10_invalid_api_key.json`,
+      `error_3_invalid_method.json`. ADR-0004 yazıldı.
+      **Konum kararı:** `docs/samples/` değil `tests/fixtures/`. Gerekçe: *doğrulanan
+      kaynak kazanır* — test kodu dosyayı gerçekten okur, yol değişirse test kırılır.
+      Dokümanı çalıştıran bir şey yok, orada dosya silinse kimse fark etmez. Doküman
+      payload'ı **kopyalamaz, link verir**; iki kopya kaçınılmaz olarak sapar.
+      **Biçim kararı:** pretty-printed (`json.tool --no-ensure-ascii`). Ana gerekçe
+      okunabilirlik değil **git diff**: tek satırlık JSON'da alan değişikliği görünmez.
+      `--no-ensure-ascii` olmadan non-ASCII karakterler `\uXXXX` kaçışlarına dönüşürdü.
+      **Bu kural raw katmanın tam tersi** (4. adım byte düzeyinde sadakat istiyor) —
+      aynı veri, farklı amaç, farklı kural. Karıştırılırsa 4.1'in tuzağına düşülür.
+      **Güvenlik kontrolü geçti:** `grep -rn "api_key" tests/` → eşleşme yok. Payload
+      isteği yankılamıyor. Her yeni fixture'da tekrarlanmalı.
+- [x] **Shell bilgisi boşluğu kapatıldı** (araya giren iş). `\`, `|`, `>`, `&&`, `||`,
+      `/dev/null`, exit code, `export`/`source`/`set -a` ve kullanılan komutlar
+      (`ls`, `mkdir -p`, `grep`, `echo`) not 12'de toplandı. Ayrıca bash ↔ PowerShell
+      sözlüğü. Gerekçe: `PROJECT_CONTEXT.md` §7 shell'i "konunun kendisi" sayıyor;
+      CI, Dockerfile, cron ve Makefile hep shell.
+      **Düzeltme:** verdiğim komutlardaki `set -a` teknik olarak gereksizdi — `$VAR`
+      komut satırında geçtiğinde bash onu zaten genişletiyor. Export yalnızca alt süreç
+      (`os.environ`) okuyacaksa gerekli. Adım 2'de gerekli olacağı için alışkanlık
+      olarak yazıldı.
 
 ## Açık sorular
 
