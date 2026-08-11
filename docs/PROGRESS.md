@@ -13,15 +13,15 @@ Kural: bu dosya yalan söyleyebilir (güncellemeyi unutursan). `git log --onelin
 
 **Last updated:** 2026-08-11 (iş bilgisayarı)
 **Current step:** 1 — Veriyi tanı ([plan](ROADMAP.md#adım-1--veriyi-tanı))
-**Next sub-step:** 1.5 — Payload anatomisi: alan listesi, tipler, null'lar, iç içelik
+**Next sub-step:** 1.6 — Grain kararı: "Bir satır = ..." cümlesini kurmak
 
 > **ADIM 0 TAMAMLANDI.** Bitti tanımının beş maddesi de doğrulandı (aşağıda).
-> **1.1, 1.2, 1.3, 1.4 TAMAMLANDI.**
+> **1.1, 1.2, 1.3, 1.4, 1.5 TAMAMLANDI.**
 
-**1.5'in girdisi hazır:** `tests/fixtures/lastfm/chart_gettoptracks_success.json` (20 parça).
-İlk bakışta göze çarpanlar — 1.5'te tek tek incelenecek: tüm sayılar **string** geliyor
-(`"duration": "184"`), `artist` ve `streamable` **iç içe nesne**, `image` dört elemanlı
-dizi, ve anahtar adlarında `#text` gibi **XML kalıntıları** var.
+**1.6'nın girdisi — 1.5'te ölçülen ve grain kararını doğrudan etkileyen üç şey:**
+`mbid` kuyrukta %21 boş (anahtar adayı ama tek başına yetmiyor), aynı sanatçının birden
+fazla parçası aynı payload'da geliyor (sanatçı boyut mu, kolon mu?), ve payload'da
+**tarih alanı yok** — çekildiği gün dışarıdan eklenmek zorunda.
 
 **Adım 1 hatırlatması:** bu adımın çıktısı kod değil, **bilgi ve örnek dosya**. Kod yazma
 isteği gelirse Adım 3'e aittir.
@@ -180,6 +180,63 @@ isteği gelirse Adım 3'e aittir.
       komut satırında geçtiğinde bash onu zaten genişletiyor. Export yalnızca alt süreç
       (`os.environ`) okuyacaksa gerekli. Adım 2'de gerekli olacağı için alışkanlık
       olarak yazıldı.
+
+- [x] **1.5** Payload anatomisi ölçüldü. Not 13 (keşif protokolü) yazıldı.
+
+      **Yapı:** `{"tracks": {"track": [...], "@attr": {...}}}`. Bir kaydın alanları:
+      `name, duration, playcount, listeners, mbid, url, streamable, artist, image`.
+      `artist` ve `streamable` iç içe nesne, `image` dört elemanlı dizi.
+
+      **XML kökeni her şeyi açıklıyor.** Last.fm JSON üretmiyor — XML üretip çeviriyor.
+      Üç sonucu var: (1) **istisnasız her sayı string** (`"duration": "184"`, `@attr`
+      içindeki sayfa numaraları dahil), çünkü XML'de tip yok; (2) `#text` anahtarı bir
+      veri değil **yapı kalıntısı** — XML'de `<image size="small">url</image>` gibi hem
+      öznitelik hem metin taşıyan eleman JSON'a böyle çevrilir; (3) XML'de `null`
+      kavramı olmadığı için eksik veri `""` olarak gelir, `None` olarak değil.
+      Ölçüldü: payload'da hiç `None` yok.
+
+      **Tek elemanlı liste tuzağı YOK.** `limit=1` ile ölçüldü → `list` döndü, tek dict
+      değil. Yani 5. adımda normalizasyon kodu (`if isinstance(t, dict): t = [t]`)
+      **yazılmayacak**. Ölçmeseydik "her ihtimale karşı" yazılırdı — §6'nın yasakladığı
+      şey. Ölçüm bazen kod eklettirir, bazen kod yazdırmaz.
+
+      **EN ÖNEMLİ BULGU — ilk sayfa yalan söyledi.** Aynı endpoint, aynı gün, tek fark
+      `page` numarası:
+
+      | Ölçüm | `page=1` | `page=500` |
+      |---|---|---|
+      | Kayıt sayısı | 20 | **19** |
+      | Boş `mbid` (track) | 0 | **4 (%21)** |
+      | Boş `mbid` (artist) | 0 | 1 |
+      | `duration == 0` | 0 | **2** |
+      | Alan setleri aynı mı | True | **False** |
+
+      Sebep: chart popülerlik sıralı. En popüler kayıtlar en iyi kürate edilmiş olanlar —
+      ilk sayfa veri kalitesinin **en yüksek** olduğu yer. Adı: **seçim yanlılığı**.
+
+      **`mbid` bazen boş değil, anahtar olarak HİÇ YOK.** Kuyruktaki örnek kayıtta
+      `mbid` anahtarı dict'te bulunmuyor. Yani üç ayrı durum var: `x["mbid"]` → `KeyError`,
+      `x.get("mbid")` → `None`, `x.get("mbid","")` → `""`. İlk sayfayla test eden kod
+      kuyrukta patlar.
+
+      **`image` dolu görünen boş alan.** 20 parça × 4 boyut = 80 URL beklenirken
+      **4 benzersiz URL** çıktı — hepsi Last.fm'in "resim yok" varsayılanı
+      (`2a96cbd8b46e442fc41c2b86b821562f.png`). Null kontrolünden geçer, içeriği çöp.
+      `isna()` tipi kontroller bunu **yakalamaz**.
+
+      **`duration == 0` belirsiz.** Parça 0 saniye mi, süre bilinmiyor mu? API ayırt
+      etmiyor. Ortalama süre hesabında 0'lar sonucu bozar. `0 → null` çevrilmeli mi,
+      5.4'ün kararı.
+
+      **`@attr` sayfalama bilgisi:** `page, perPage, totalPages, total` — hepsi string.
+      `total: 10000` ve `totalPages: 500` tam çarpım (500×20) veriyor, yani gerçek sayım
+      değil **tavan** olma ihtimali yüksek. Son sayfanın 19 kayıt döndürmesi `total`'ın
+      zaten tutarsız olduğunu gösteriyor.
+
+      **İkinci fixture eklendi:** `chart_gettoptracks_edge_cases.json` (page=500).
+      Gerekçe: mevcut fixture'da hiç edge case yoktu, 7.4'ün testleri onunla yazılamazdı.
+      Dosya adı `page500` değil `edge_cases` — ad, verinin **nereden geldiğini** değil
+      **ne işe yaradığını** söylemeli.
 
 ## Açık sorular
 

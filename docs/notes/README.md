@@ -27,6 +27,7 @@ Testi tek soru: **"Bu bilgi başka bir projede de geçerli mi?"**
 | [10](10-writing-a-readme.md) | README yazmak: okuyucular, bölümler, test etme, anti-pattern'lar | 0.5 |
 | [11](11-manual-api-calls-and-auth-models.md) | API'yi elle çağırmak, `.env` yükleme, regex, auth modelleri kataloğu | 1.2 |
 | [12](12-shell-basics.md) | Shell temelleri: operatörler, exit code, `export`/`source`, bash ↔ PowerShell | 1.4 |
+| [13](13-data-source-discovery.md) | Yeni veri kaynağı keşif protokolü: altı boyut, örnekleme, null'ın yüzleri | 1.5 |
 
 ---
 
