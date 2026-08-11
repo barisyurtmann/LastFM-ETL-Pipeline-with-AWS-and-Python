@@ -398,9 +398,20 @@ grep -rn "api_key" tests/
 | `-i` | Büyük/küçük harf ayrımı yapmaz |
 | `-l` | Sadece dosya adlarını yazar, satırları değil |
 | `-v` | Eşleşme**yen** satırları göster (tersine çevirir) |
-| `-c` | Eşleşme sayısını yaz |
+| `-c` | Eşleşen **satır** sayısını yaz (satırların kendisini değil) |
 
 Adı "**g**lobally search for a **r**egular **e**xpression and **p**rint" ifadesinden gelir.
+
+**`-c` ne sayar:** eşleşen **satır** sayısını, eşleşme sayısını değil. Bir satırda kelime
+üç kez geçse bile `1` sayılır.
+
+```bash
+grep -c "name" dosya.json        # kac SATIRDA gecti
+grep -o "name" dosya.json | wc -l   # kac KEZ gecti
+```
+
+`-o` yalnızca eşleşen parçaları basar (her biri ayrı satırda), `wc -l` satırları sayar.
+Bu ayrım, "kaç kayıt var" diye sayarken yanlış sonuç almanın klasik sebebidir.
 
 Bizim kullanımımız bir **güvenlik kontrolüydü**: fixture dosyalarına API key sızmış mı?
 Dosyalar git'e girecek ve bir kez sızan sır geçmişte kalır.
