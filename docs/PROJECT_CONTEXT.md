@@ -73,15 +73,33 @@ klasör yapısı değil.
 | Auth | OAuth, token süresi dolar | Sadece `api_key` query parametresi |
 | Endpoint | Kaynak başına ayrı URL | **Tek URL**, `method` parametresi değişir |
 | Varsayılan format | JSON | **XML** — `format=json` göndermek zorunlu |
-| Hata davranışı | HTTP status kodu doğru | **Hatada bile HTTP 200** dönebilir |
+| Hata davranışı | HTTP status kodu doğru | Status **ve** gövde birlikte hata taşır (bkz. aşağıdaki ölçüm) |
 
 ### İki kritik tuzak
 
 1. **`format=json` unutulursa** → XML döner, `response.json()` patlar.
-2. **Hata gövdenin içinde gelir** → HTTP 200 ile birlikte
-   `{"error": 10, "message": "Invalid API key"}`. Yani `raise_for_status()` yetmez,
-   gövdede `error` anahtarı var mı diye ayrıca bakmak gerekir.
-   Bu, "sessiz başarı" hatasının ders kitabı örneği.
+2. **Hata iki katmanda birden gelir** → HTTP status *ve* gövdedeki `error` kodu.
+   Adım 1.3'te ölçüldü (tahmin değil):
+
+   | Deney | Status | Gövde |
+   |---|---|---|
+   | Bozuk `api_key` | `403` | `{"message":"Invalid API key...","error":10}` |
+   | Bozuk `method` | `400` | `{"message":"Invalid Method...","error":3}` |
+
+   **Düzeltme:** bu dosyanın önceki hâli "hatada bile HTTP 200 döner" diyordu.
+   Ölçüm bunu bu iki hata için çürüttü — Last.fm status kodlarını doğru kullanıyor.
+   İddia, kod yazılmadan önce ölçüldüğü için ucuza düzeltildi.
+
+   **Yine de `raise_for_status()` tek başına yetmez.** Üç sebeple:
+   - Status ayrıntıyı söylemez: `403`, "key geçersiz" (10) ile "key askıya alındı"
+     (26) arasını ayırt edemez. Teşhis gövdededir.
+   - Retry kararı `error` koduna dayanır (kalıcı / geçici / rate limit ayrımı).
+   - `raise_for_status()` fırladığı anda **gövde okunmadan akış kopar** — teşhis
+     bilgisi kaybolur. Doğru sıra: önce gövdeyi oku, sonra hata fırlat.
+
+   **Henüz ölçülmedi:** geçerli key + geçerli metod ama sonuç yok durumu
+   (`200` + boş liste mi, yoksa `error` mü). Sessiz veri kaybının en olası yeri;
+   Adım 1.5'te bakılacak.
 
 ### İşe yarar metodlar
 

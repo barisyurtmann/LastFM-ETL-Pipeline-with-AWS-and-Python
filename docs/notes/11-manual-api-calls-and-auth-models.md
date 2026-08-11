@@ -299,6 +299,51 @@ print(response.text[:200])
 fark edildiğini** söyler — **nerede oluştuğunu** değil. `.json()` parse ederken fark eder,
 hata ise çok önce, isteği kurarken yapılmıştır.
 
+### `raise_for_status()` tam olarak ne yapar
+
+Yalnızca `response.status_code`'a bakar: 400–499 arasıysa `HTTPError`, 500–599 arasıysa
+`HTTPError`, değilse hiçbir şey. **Gövdeyi hiç açmaz.**
+
+Bunun iki ayrı sonucu var ve ikisi de sahada ölçüldü (Adım 1.3):
+
+| Deney | Status | Gövde | `raise_for_status()` |
+|---|---|---|---|
+| `format` yok (XML döner) | `200` | `<?xml ...` | Sessiz — **yakalayamaz** |
+| Bozuk `api_key` | `403` | `{"error":10,...}` | Fırlar — **yakalar** |
+| Bozuk `method` | `400` | `{"error":3,...}` | Fırlar — **yakalar** |
+
+Yani "API hatada 200 döner" gibi bir genelleme yapmak yanlıştı. Last.fm status kodlarını
+doğru kullanıyor. **Ama `raise_for_status()` yine de yeterli bir kontrol değil**, ve
+sebebi sanılandan farklı:
+
+| Sanılan gerekçe | Gerçek gerekçe |
+|---|---|
+| "HTTP yalan söylüyor" | **"HTTP yeterince şey söylemiyor"** |
+
+`403` sana "yasak" der. Hangisi — key geçersiz mi (`error: 10`), yoksa askıya mı alınmış
+(`error: 26`)? Birincisinde yazım hatası ararsın, ikincisinde sağlayıcıya yazarsın.
+Status ikisini ayırt edemez, gövdedeki kod eder.
+
+Ve en sinsi kısmı: **`raise_for_status()` fırladığı anda gövde okunmadan akış kopar.**
+Teşhis bilgisi cevabın içinde durur ama sen ona hiç bakmamış olursun.
+
+Doğru desen bu yüzden şudur:
+
+```python
+# Read the body first: the diagnostic detail lives there, not in the status code
+payload = response.json()
+if "error" in payload:
+    raise LastFmApiError(code=payload["error"], message=payload["message"])
+response.raise_for_status()
+```
+
+`raise_for_status()`'ü tek başına kullanmak, "hata var mı" sorusunu cevaplar;
+"**hangi** hata" sorusunu cevaplamaz. Retry kararı ikincisine bağlıdır.
+
+**Genel kural (Last.fm'e özgü değil):** hem HTTP status'ü hem gövdeyi kontrol et.
+Hangi API'nin hatayı nereye koyduğunu ezberlemek yerine ikisine birden bakmak, hem
+daha kısa hem de API değiştiğinde kırılmayan koddur.
+
 ---
 
 ## 8. Auth modelleri kataloğu
@@ -521,6 +566,13 @@ yaratır.
 | Shared secret'ı da `.env`'e koymak lazım | Gerekmez. Bu proje sadece public metodları çağırıyor; kullanılmayan sır sıfır fayda, artı risk |
 | `format` query param'ı bir tasarım hatası | Takas. URL'yi kendi kendine yeterli ve cache dostu yapar; karşılığında standart dışıdır |
 | PowerShell'de `curl` = curl | Hayır, `Invoke-WebRequest` alias'ı. `curl.exe` yazmak gerekir |
+| Last.fm **her** hatada `200` döner | Hayır — ölçüldü: bozuk key `403`, bozuk metod `400`. Genelleme dokümandan geliyordu, ölçümden değil |
+| Bu yüzden `raise_for_status()` yeterlidir | Yine yeterli değil, ama sebebi farklı: status hangi hata olduğunu söylemez ve fırladığında gövdeyi okumadan akışı koparır |
+
+> **Bu satırların ders değeri:** ikisi de iddiaydı, ölçümle çürüdü — ve bu **kod
+> yazılmadan önce** oldu. Aynı yanlış varsayım Adım 3'te retry mantığına gömülseydi,
+> düzeltmesi bir dosya değil bir mimari olurdu. "Önce veriyi tanı" adımının tüm gerekçesi
+> bu tek cümlede duruyor.
 
 ---
 

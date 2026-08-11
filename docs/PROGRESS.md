@@ -13,15 +13,15 @@ Kural: bu dosya yalan söyleyebilir (güncellemeyi unutursan). `git log --onelin
 
 **Last updated:** 2026-08-11 (iş bilgisayarı)
 **Current step:** 1 — Veriyi tanı ([plan](ROADMAP.md#adım-1--veriyi-tanı))
-**Next sub-step:** 1.3 — Bozuk `api_key` ile çağır, HTTP 200 + gövdede `error` davranışını gör
+**Next sub-step:** 1.4 — Gerçek payload'ı diske kaydet (konum kararı: `tests/fixtures/` mi `docs/samples/` mi)
 
 > **ADIM 0 TAMAMLANDI.** Bitti tanımının beş maddesi de doğrulandı (aşağıda).
-> **1.1 ve 1.2 TAMAMLANDI.**
+> **1.1, 1.2, 1.3 TAMAMLANDI.**
 
-**1.3'ün hazırlığı:** ortam ve çağrı biçimi hazır. Aynı `curl.exe` komutu, tek fark
-`api_key` değerinin bilinçli olarak bozulması. Beklenti (henüz **doğrulanmadı**):
-HTTP `200` + gövdede `{"error": 10, "message": "Invalid API key..."}`.
-Bu payload da 1.4'te diske kaydedilecek — hata payload'ı başarı payload'ı kadar değerli.
+**1.4'e taşınan malzeme:** kaydedilecek üç payload hazır — başarı (`chart.getTopArtists`),
+hata `error 10` (bozuk key, 403), hata `error 3` (bozuk metod, 400). ROADMAP'in açık
+sorusu 1.4'te karara bağlanacak: aynı dosya hem insan (doküman) hem test (fixture)
+tarafından okunacak, iki kopya tutmak sapma demektir.
 
 **Adım 1 hatırlatması:** bu adımın çıktısı kod değil, **bilgi ve örnek dosya**. Kod yazma
 isteği gelirse Adım 3'e aittir.
@@ -124,6 +124,31 @@ isteği gelirse Adım 3'e aittir.
       `$env:LASTFM_API_KEY` kullanıldı. Metod seçimi keyfi değil: `PROJECT_CONTEXT.md` §4
       zaten `method=chart_gettopartists` yolunu varsayıyor.
       Not: `docs/notes/11`.
+
+- [x] **1.3** Bozuk `api_key` ile çağrıldı. **Ölçüm, beklentiyi çürüttü.**
+
+      | Deney | Status | Content-Type | Gövde |
+      |---|---|---|---|
+      | Bozuk `api_key` | `403` | `application/json` | `{"message":"Invalid API key...","error":10}` |
+      | Bozuk `method` | `400` | `application/json` | `{"message":"Invalid Method...","error":3}` |
+
+      Beklenti `200` + gövdede hata idi (`PROJECT_CONTEXT.md` §3'ün eski hâli ve
+      Claude'un iddiası). Gerçek: Last.fm HTTP status kodlarını **doğru** kullanıyor.
+      `Content-Type: application/json` ve gövde formatı, cevabın araya giren bir
+      WAF/CDN'den değil Last.fm'in kendisinden geldiğini kanıtlıyor.
+      `PROJECT_CONTEXT.md` §3 ölçüme göre düzeltildi.
+      **Ders:** iddia, kod yazılmadan önce ölçüldüğü için ucuza düzeltildi. Adım 1'in
+      var oluş sebebi tam olarak bu.
+      **Gövde kontrolü yine de zorunlu, ama gerekçesi değişti** — "HTTP yalan söylüyor"
+      değil, "HTTP yeterince şey söylemiyor": `403` tek başına `error 10` (geçersiz key)
+      ile `error 26` (askıya alınmış key) arasını ayırt edemez, retry sınıfını belirleyemez,
+      ve `raise_for_status()` fırladığı anda gövde okunmadan akış kopar.
+      **Yan bulgu:** `requests`, `HTTPError` mesajına **tam URL'yi** gömüyor — query
+      string dahil. Gerçek key kullanılsaydı traceback'te düz metin olarak dururdu.
+      Not 11 §8.2'deki teorik risk canlı kanıtla doğrulandı. Maskeleme 3.7'de.
+      **ADR adayı düzeltmesi:** ROADMAP'te 3.3 için yazan
+      *"Treat HTTP 200 with an error body as a failure"* başlığı ölçüme uymuyor;
+      ADR yazılırken *"Validate both HTTP status and response body"* olacak.
 
 ## Açık sorular
 
