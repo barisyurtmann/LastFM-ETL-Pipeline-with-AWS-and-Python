@@ -11,38 +11,20 @@ Kural: bu dosya yalan söyleyebilir (güncellemeyi unutursan). `git log --onelin
 
 ---
 
-**Last updated:** 2026-08-10 (ev bilgisayarı)
+**Last updated:** 2026-08-11 (iş bilgisayarı)
 **Current step:** 1 — Veriyi tanı ([plan](ROADMAP.md#adım-1--veriyi-tanı))
-**Next sub-step:** 1.1 — Last.fm API key al, `.env`'e koy
+**Next sub-step:** 1.3 — Bozuk `api_key` ile çağır, HTTP 200 + gövdede `error` davranışını gör
 
 > **ADIM 0 TAMAMLANDI.** Bitti tanımının beş maddesi de doğrulandı (aşağıda).
+> **1.1 ve 1.2 TAMAMLANDI.**
 
-**Sıradaki oturumda ilk iş — iş bilgisayarı:**
+**1.3'ün hazırlığı:** ortam ve çağrı biçimi hazır. Aynı `curl.exe` komutu, tek fark
+`api_key` değerinin bilinçli olarak bozulması. Beklenti (henüz **doğrulanmadı**):
+HTTP `200` + gövdede `{"error": 10, "message": "Invalid API key..."}`.
+Bu payload da 1.4'te diske kaydedilecek — hata payload'ı başarı payload'ı kadar değerli.
 
-> **1. `git pull`** (bu makinede birkaç commit bekliyor).
->
-> **2. `uv` bu makinede KURULU DEĞİL.** Önce kur, sonra terminali kapat-aç:
-> ```
-> winget install --id=astral-sh.uv -e
-> uv --version
-> ```
-> `command not found` alırsan `PATH` henüz yenilenmemiştir; terminal yeniden açılmalı.
-> Teşhis: `which uv`. Detay: `docs/notes/09` §2 ve §7.
->
-> **3. `uv sync`** → `.venv/` + bağımlılıklar. `.venv/` git'e girmez, her makinede
-> yeniden kurulur.
->
-> **4. Doğrulama:** `uv run python -c "import lastfm_etl; print('ok')"`
-> Ayrıca `git status` **temiz** olmalı.
->
-> **5. Sonra 1.1'e geçilir.** Adım 1'in çıktısı kod değil — **bilgi ve bir örnek
-> dosya**. Amaç: tek satır pipeline kodu yazmadan gerçek payload'ı elle görmek.
-> Şema, grain ve partition kararları buna dayanacak.
-
-**1.1'de bekleyen devredilmiş doğrulama:** `.env.example` ile gerçek `.env` arasındaki
-anahtar listesi birebir aynı mı — 0.5'te `.env` henüz yokken doğrulanamamıştı.
-Gerçek key `.env`'e girdiğinde `git status`'un onu **göstermediği** de teyit edilmeli
-(0.5'te boş dosyayla test edildi, gerçek sırla değil).
+**Adım 1 hatırlatması:** bu adımın çıktısı kod değil, **bilgi ve örnek dosya**. Kod yazma
+isteği gelirse Adım 3'e aittir.
 
 ---
 
@@ -112,6 +94,37 @@ Gerçek key `.env`'e girdiğinde `git status`'un onu **göstermediği** de teyit
       | `.env.example` var, gerçek `.env` yok | Doğrulandı; **anahtar senkronu 1.1'e devredildi** |
       | README bir yabancıya yetiyor | Boş klasörde `git clone` + README'yi sıfırdan takip — geçti |
 
+- [x] **İş makinesi ortamı kuruldu** (ROADMAP'te yazmayan, araya giren iş).
+      `winget install --id=astral-sh.uv -e` → terminal kapat-aç → `uv sync`.
+      Doğrulama geçti: `import lastfm_etl` çıktısı `src\lastfm_etl\__init__.py`,
+      `git status` temiz. İki makine artık aynı `uv.lock`'tan besleniyor.
+- [x] **1.1** Last.fm API key alındı, `.env`'e yazıldı.
+      **Shared Secret bilinçli olarak eklenmedi.** Gerekçe: bu proje yalnızca public
+      chart metodlarını (`chart.getTopArtists` vb.) çağırıyor; bunlar sadece `api_key`
+      ister. `shared_secret` yalnızca `api_sig` üretmek için gerekir — yani authenticated
+      metodlarda (`track.scrobble`, kullanıcıya özel veri). Kullanılmayan bir sır sıfır
+      fayda sağlar ama sızma yüzeyini büyütür; ayrıca `.env.example`'a eklenirse sözleşme
+      yalan söyler.
+      Ayrım: `api_key` **kim olduğunu** söyler, `shared_secret` **o olduğunu kanıtlar**.
+      **0.5'ten devredilen doğrulama kapandı:** `git status` gerçek sır içeren `.env`'i
+      göstermiyor, `git status --ignored --short` `!! .env` diyor, `.env.example` ile
+      anahtar seti birebir aynı (tek anahtar: `LASTFM_API_KEY`).
+- [x] **1.2** API elle çağrıldı (`curl.exe`), `format=json` ile ve olmadan.
+      **Ölçüm — tuzak gözle doğrulandı:**
+
+      | | `format` yok | `format=json` |
+      |---|---|---|
+      | Status | `200` | `200` |
+      | `Content-Type` | `text/xml` | `application/json` |
+      | Gövde ilk karakteri | `<` | `{` |
+
+      Kritik sonuç: **iki cevabın status kodu aynı.** `raise_for_status()` bu durumu
+      yakalayamaz; ayrım yalnızca `Content-Type` header'ında ve gövdede görünür.
+      Sır komut geçmişine sokulmadı — `.env` önce oturuma yüklendi, URL'de
+      `$env:LASTFM_API_KEY` kullanıldı. Metod seçimi keyfi değil: `PROJECT_CONTEXT.md` §4
+      zaten `method=chart_gettopartists` yolunu varsayıyor.
+      Not: `docs/notes/11`.
+
 ## Açık sorular
 
 - Build backend `setuptools` seçildi; `uv` bir build backend değil (resolver + paket
@@ -134,8 +147,12 @@ Gerçek key `.env`'e girdiğinde `git status`'un onu **göstermediği** de teyit
 ## Sonraki oturum için hatırlatma
 
 - Oturuma `git pull` ile başla, `git push` ile bitir. İki makinede çalışılıyor.
-- İş makinesinde ilk `git pull`'dan sonra `git status` **temiz** olmalı. Kirliyse
-  `.gitattributes` orada uygulanmamış demektir — `git ls-files --eol` ile bak.
-- **İş makinesinde `uv` kurulu değil.** Ortam kurulmadan hiçbir şey çalışmaz.
+- `git pull` sonrası `git status` **temiz** olmalı. Kirliyse `.gitattributes` o makinede
+  uygulanmamış demektir — `git ls-files --eol` ile bak.
+- **`uv` her iki makinede de kurulu** (ev + iş). Yeni bir makinede `uv sync` şart.
+- **`.env` git'e girmez** — her makinede elle oluşturulur. Yeni makinede ilk iş:
+  `.env.example`'ı kopyalayıp gerçek key'i yazmak.
+- `curl` çağrılarından önce `.env`'i oturuma yükle (`docs/notes/11` §3). Sır komut
+  satırına elle yazılmaz.
 - Adım 1 kod adımı **değil**. Çıktısı: kaydedilmiş gerçek payload + hata payload'ı +
   grain cümlesi + hedef şema tablosu. Kod yazma isteği gelirse Adım 3'e ait demektir.
