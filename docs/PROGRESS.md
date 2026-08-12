@@ -11,17 +11,17 @@ Kural: bu dosya yalan söyleyebilir (güncellemeyi unutursan). `git log --onelin
 
 ---
 
-**Last updated:** 2026-08-11 (iş bilgisayarı)
+**Last updated:** 2026-08-12
 **Current step:** 1 — Veriyi tanı ([plan](ROADMAP.md#adım-1--veriyi-tanı))
-**Next sub-step:** 1.6 — Grain kararı: "Bir satır = ..." cümlesini kurmak
+**Next sub-step:** 1.7 — Hedef şema taslağı (tablo hâlinde, kod değil)
 
 > **ADIM 0 TAMAMLANDI.** Bitti tanımının beş maddesi de doğrulandı (aşağıda).
-> **1.1, 1.2, 1.3, 1.4, 1.5 TAMAMLANDI.**
+> **1.1, 1.2, 1.3, 1.4, 1.5, 1.6 TAMAMLANDI.**
 
-**1.6'nın girdisi — 1.5'te ölçülen ve grain kararını doğrudan etkileyen üç şey:**
-`mbid` kuyrukta %21 boş (anahtar adayı ama tek başına yetmiyor), aynı sanatçının birden
-fazla parçası aynı payload'da geliyor (sanatçı boyut mu, kolon mu?), ve payload'da
-**tarih alanı yok** — çekildiği gün dışarıdan eklenmek zorunda.
+**1.7'nin girdisi — 1.6'da karara bağlanan grain:**
+`(snapshot_date, artist_name, track_name)`. Hedef şema tablosu bu anahtarın etrafında
+kurulacak. 1.7'ye devredilen üç açık konu aşağıda (rank alanı, `artist.mbid`, sayfa
+kayması).
 
 **Adım 1 hatırlatması:** bu adımın çıktısı kod değil, **bilgi ve örnek dosya**. Kod yazma
 isteği gelirse Adım 3'e aittir.
@@ -238,6 +238,68 @@ isteği gelirse Adım 3'e aittir.
       Dosya adı `page500` değil `edge_cases` — ad, verinin **nereden geldiğini** değil
       **ne işe yaradığını** söylemeli.
 
+- [x] **1.6** Grain karara bağlandı. ADR-0005 yazıldı, not 14 eklendi.
+
+      > **Bir satır = bir UTC gününde, Last.fm global top-tracks chart'ında görünen bir
+      > parçanın o çekim anındaki durumu.**
+
+      Birincil anahtar: **`(snapshot_date, artist_name, track_name)`**
+      Kimball terimiyle: **periodic snapshot fact table**.
+
+      **Ölçüm — iki anahtar adayı da tam benzersiz çıktı:**
+
+      | Dosya | rows | `name+artist` | `url` | tekil `artist` |
+      |---|---|---|---|---|
+      | `..._success.json` (page=1) | 20 | 20 | 20 | **6** |
+      | `..._edge_cases.json` (page=500) | 19 | 19 | 19 | 19 |
+
+      `url` fazladan ayrım yapmıyor — aynı iki alanın URL-encode edilmiş hali.
+      Seçim `(artist_name, track_name)`; `url` normal kolon olarak saklanıyor.
+      Gerekçe: URL bir **kimlik değil adres**tir — anahtar yapmak veri modelini Last.fm'in
+      site yapısına bağlar ve her filtreyi encode'lu string karşılaştırmasına çevirir.
+      Kabul edilen bedel: isim değişirse geçmiş satırlar eski adı taşır (snapshot
+      semantiğinin doğal sonucu, bug değil — veri kaybolmuyor, isim üzerinden uzun aralıklı
+      join garanti edilemiyor).
+
+      **`mbid` anahtara girmedi.** Öznitelik olarak kalıyor. Üç gerekçe: (1) kuyrukta
+      4/19 kayıtta anahtar **yok**, NULL bileşenli `UNIQUE` SQL'de zorlanamaz
+      (`NULL != NULL`); (2) MusicBrainz'in kimliği, Last.fm'in değil — yabancı sistemin
+      anahtarı; (3) dün boş bugün dolu olabilir, anahtar değişirse aynı parça yeni kayıt
+      gibi görünür. **Genel kural:** anahtara alan eklemek onu güçlendirmez, grain'i
+      **inceltir** ve çiftlenme riskini artırır.
+
+      **PROGRESS düzeltmesi — 1.5'teki ifade yanlıştı.** 1.5'te `mbid` için "%21 **boş**"
+      yazılmıştı; ölçüm bunu çürüttü: `anahtar yok 4, boş string 0, dolu 15`. Yani boş
+      değil, **eksik**. Kod farkı: `x.get("mbid")` → `None` riski var, `""` riski **yok**.
+      5.4'te `if mbid == "":` dalı yazılmayacak. (Uyarı: `artist.mbid` ayrı ölçülmedi,
+      1.5 orada "boş" demişti — 1.7'de kontrol edilecek.)
+
+      **En kritik düzeltme — "üzerine yaz, son playcount kalsın" reddedildi.**
+      İlk cevabım tek satır tutup güncellemekti. Bu SCD Type 1'dir ve burada bilgi
+      imhasıdır: `playcount` **kümülatif sayaç**, günlük artış ancak iki snapshot farkından
+      türetilir (`playcount(t) - playcount(t-1)`). Üzerine yazınca fark sonsuza kadar
+      kaybolur. Ve `chart.getTopTracks` tarih parametresi almıyor — çekilmeyen gün
+      **kalıcı boşluk**. Hata sessizdir: pipeline hiç patlamaz, aylar sonra "trend
+      çıkaralım" denince verinin hiç var olmadığı anlaşılır.
+      OLTP (bugünkü durumun aynası) ≠ OLAP (kaynağı zaman içinde gözlemlemek).
+
+      **`snapshot_date` ≠ `ingested_at` — iki ayrı kolon kalıyor.** Normal koşuda
+      çakışıyorlar; backfill'de ayrışıyorlar (`ingested_at` bugün, `snapshot_date` geçmiş).
+      Tek kolon biri hakkında yalan söylemek zorunda kalır.
+
+      **Gün UTC.** Tercih değil zorunluluk: ev (TRT) + iş + 9.7'de Lambda (UTC).
+      `date.today()` local döner, aynı chart iki farklı `snapshot_date` alır ve anahtar
+      ortamdan ortama değişir. `datetime.utcnow()` de yanlış — tz bilgisi taşımıyor.
+      Doğrusu `datetime.now(timezone.utc)`.
+
+      **Bedava gelen sonuç:** anahtara tarih girdiği için aynı günün tekrar koşusu aynı
+      anahtarı üretir → `snapshot_date` partition overwrite ile satır sayısı artmaz.
+      4.5, 5.7 ve 6.8 grain'den türedi, sonradan eklenmedi.
+
+      **Artist boyut tablosu açılmadı.** Page 1'de 6 sanatçı 20 parçayı paylaşıyor, yani
+      dimension savunulabilir — ama ROADMAP'te sanatçı özniteliği isteyen sorgu yok, ikinci
+      tablo yazma yolunu ve idempotency yüzeyini ikiye katlar. Denormalize kalıyor.
+
 ## Açık sorular
 
 - Build backend `setuptools` seçildi; `uv` bir build backend değil (resolver + paket
@@ -248,6 +310,17 @@ isteği gelirse Adım 3'e aittir.
   `.python-version` ile sabitlenecek. Şimdilik bilinçli olarak eklenmedi.
 - Adım 8.5'te CI'da `uv`'nin **kendi sürümü** sabitlenecek. Bağımlılıkları kilitleyip
   aracı kilitlememek, "kendiliğinden bozulan build" riskini açık bırakır.
+- **`rank` alanı payload'da yok.** Chart verisinin en değerli bilgisi sıralama ve hiçbir
+  alanda durmuyor — yalnızca **dizinin sırası** taşıyor
+  (`rank = (page-1)*perPage + index + 1`). Yani JSON dizisinin sırası veri. Transform'da
+  sıra bozulursa bilgi kaybolur. Türetilecek mi, nasıl? → 1.7.
+- **`artist.mbid` ölçülmedi.** 1.5 orada boş değer gördüğünü söylüyor; track `mbid`'inde
+  "boş" ifadesinin yanlış çıktığı göz önüne alınırsa bu da ölçülmeli. → 1.7.
+- **Aynı gün içinde sayfa kayması.** Chart sayfalar çekilirken yeniden sıralanırsa aynı
+  parça iki sayfada görünebilir ve anahtar tek `snapshot_date` içinde çakışır. Gözlenmedi
+  (iki fixture farklı sayfalar, kesişim yok) ama çürütülmedi de. → 4.5 / 5.8.
+- **`chart.getTopTracks` tarih parametresi almıyor** iddiası API dokümanına dayanıyor,
+  ölçülmedi. Doğruysa backfill yalnızca raw katmandan yapılabilir. → 1.8.
 
 ## Git geçmişinde görünmeyen kararlar
 

@@ -28,6 +28,7 @@ Testi tek soru: **"Bu bilgi başka bir projede de geçerli mi?"**
 | [11](11-manual-api-calls-and-auth-models.md) | API'yi elle çağırmak, `.env` yükleme, regex, auth modelleri kataloğu | 1.2 |
 | [12](12-shell-basics.md) | Shell temelleri: operatörler, exit code, `export`/`source`, bash ↔ PowerShell | 1.4 |
 | [13](13-data-source-discovery.md) | Yeni veri kaynağı keşif protokolü: altı boyut, örnekleme, null'ın yüzleri | 1.5 |
+| [14](14-grain-and-fact-tables.md) | Grain belirleme protokolü, fact table türleri, anahtar seçimi, mixed grain | 1.6 |
 
 ---
 
