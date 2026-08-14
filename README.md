@@ -76,7 +76,8 @@ structure (`raw/`, `curated/`) so that moving to AWS does not change any path lo
 | [`docs/ROADMAP.md`](docs/ROADMAP.md) | The plan: 9 steps, sub-steps, definitions of done |
 | [`docs/PROGRESS.md`](docs/PROGRESS.md) | Current position — single source of truth |
 | [`docs/adr/`](docs/adr/) | Architecture Decision Records |
-| [`docs/notes/`](docs/notes/) | Learning notes (written in Turkish) |
+| [`docs/notes/`](docs/notes/) | Learning notes, one per sub-step (written in Turkish) |
+| [`docs/TOOLING.md`](docs/TOOLING.md) | Data tooling landscape: layers, selection criteria, cost models (written in Turkish) |
 
 Three separate files exist by design: **contract ≠ plan ≠ position.** Keeping the same
 information in two places guarantees drift.

@@ -207,6 +207,11 @@ orchestration DAG'ı · maliyet optimizasyonu (dosya boyutu, partition sayısı)
 | `docs/PROGRESS.md` | **Güncel durum.** Tek durum kaynağı. | TR | Her alt adımda |
 | `docs/adr/` | Bu projeye özel mimari kararlar | EN | Karar çıktıkça |
 | `docs/notes/` | Genel öğrenme notları | TR | Konu öğrenildikçe |
+| `docs/TOOLING.md` | **Araç manzarası.** Katmanlar, seçim kriterleri, maliyet modelleri | TR | Öğrendikçe — canlı belge |
 
 `adr/` mi `notes/` mi? Testi: *"Bu bilgi başka bir projede de geçerli mi?"*
 Evetse `notes/`, hayırsa `adr/`.
+
+`notes/` mi `TOOLING.md` mi? Testi: *"Bu bilgi bir alt adıma bağlı mı?"*
+Bağlıysa `notes/` — o anın öğrenmesidir, dondurulur. Bağlı değilse ve **araç seçerken**
+açılacaksa `TOOLING.md` — başvuru haritasıdır, güncellenir.
