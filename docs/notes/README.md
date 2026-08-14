@@ -30,6 +30,8 @@ Testi tek soru: **"Bu bilgi başka bir projede de geçerli mi?"**
 | [13](13-data-source-discovery.md) | Yeni veri kaynağı keşif protokolü: altı boyut, örnekleme, null'ın yüzleri | 1.5 |
 | [14](14-grain-and-fact-tables.md) | Grain belirleme protokolü, fact table türleri, anahtar seçimi, mixed grain | 1.6 |
 | [15](15-schema-design-and-field-elimination.md) | Şema tasarımı: alan eleme (4 sınav), null'ın yedi kılığı, tip seçimi, isimlendirme, ordinal materyalizasyonu | 1.7 |
+| [16](16-shell-loops-and-measurement.md) | Shell'de döngü (`for`/`while`, form seçimi, PowerShell), `curl -w` ile ölçüm, gecikme istatistikleri, ölçüm araçları | 1.8 |
+| [17](17-rate-limits-discovery-and-backoff.md) | Rate limit: dört aşamalı keşif protokolü (bash), header standartları, limit algoritmaları, üstel backoff + jitter, retry taksonomisi | 1.8 |
 
 ---
 

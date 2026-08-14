@@ -228,6 +228,10 @@ okur, ayrıştırır, ortam değişkenine yazar. Hepsi bu.
 
 `-i` bu adımda kritik bir rol oynadı: aradığımız kanıt gövdede değil, **header'daydı**.
 
+**Ölçüm bayrakları burada değil:** `-w` (`--write-out`) ile gecikme ölçmek, `curl`'ü
+döngüde çalıştırmak ve sonucu özetlemek → [not 16](16-shell-loops-and-measurement.md).
+Bu notun sorusu "API'yi elle nasıl çağırırım", onunki "bir şeyi nasıl ölçerim".
+
 ---
 
 ## 6. Windows'a özgü iki tuzak

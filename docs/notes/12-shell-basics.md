@@ -345,6 +345,14 @@ Bu hata **sinsi**: komut çalışır, cevap gelir, ama parametrelerin bir kısm�
 
 ---
 
+> **Döngüler bu notta değil.** `for` / `while` / `until`, hangi formun ne zaman
+> seçileceği, `break`/`continue`, PowerShell karşılıkları ve paralel döngü
+> → [not 16](16-shell-loops-and-measurement.md). Gerekçe: döngü sözdizimi tek başına
+> yarım bir bilgi; asıl öğrenilecek olan **hangi formu neden seçtiğin** ve o karar
+> ölçüm bağlamından ayrılmıyor.
+
+---
+
 ## 7. Kullandığımız komutlar
 
 ### `ls` — listele
