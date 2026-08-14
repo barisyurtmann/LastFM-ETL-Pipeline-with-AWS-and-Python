@@ -13,16 +13,20 @@ Kural: bu dosya yalan söyleyebilir (güncellemeyi unutursan). `git log --onelin
 
 **Last updated:** 2026-08-13
 **Current step:** 1 — Veriyi tanı ([plan](ROADMAP.md#adım-1--veriyi-tanı))
-**Next sub-step:** 1.8 — Rate limit ölçümü (Adım 1'in son alt adımı)
+**Next sub-step:** 1.8 — **devam ediyor**, iki ölçüm kaldı (pasif gecikme + tarih
+parametresi testi). Bitince Adım 1 kapanır.
 
 > **ADIM 0 TAMAMLANDI.** Bitti tanımının beş maddesi de doğrulandı (aşağıda).
-> **1.1, 1.2, 1.3, 1.4, 1.5, 1.6, 1.7 TAMAMLANDI.**
+> **1.1, 1.2, 1.3, 1.4, 1.5, 1.6, 1.7 TAMAMLANDI. 1.8 devam ediyor.**
 
-**1.8'in girdisi — 1.7'de karara bağlanan hedef şema:** 11 kolon, 4 alan gerekçeli
-reddedildi. Tablo aşağıda. Adım 5'in (transform) sözleşmesi budur.
+**Kapsam değişti — ADR-0006:** günlük çekim **top 100 sıra**, 10000 değil. Tek istekle
+`limit=100` değil, **hedef sayıya kadar sayfalama**. Günlük istek ~500 → ~5.
+Bu karar 3.9'u (yeni), 4.x'i (sayfa başına raw kayıt) ve 9.7'yi etkiliyor.
 
-**Adım 1'in bitti tanımından kalan tek madde:** "Rate limit davranışı tahmin değil,
-ölçüm" → 1.8. Diğer beş madde karşılandı.
+**Adım 1'in bitti tanımından kalan madde:** "Rate limit davranışı tahmin değil, ölçüm".
+Kısmen karşılandı: header'lar ölçüldü (yok), belgelenen limit ve kapsamı alındı,
+`limit` parametresinin davranışı ölçüldü. Aktif sondaj **bilinçli olarak yapılmadı** —
+gerekçe 1.8'de.
 
 **Adım 1 hatırlatması:** bu adımın çıktısı kod değil, **bilgi ve örnek dosya**. Kod yazma
 isteği gelirse Adım 3'e aittir.
@@ -396,6 +400,74 @@ isteği gelirse Adım 3'e aittir.
       **`NOT NULL` bir alarm olarak konuldu**, tahmin olarak değil: anahtar bileşenleri ve
       ölçüler boş gelirse **yazma patlamalı**. Bozuk veri erken ve gürültülü patlamalı,
       geç ve sessiz değil.
+
+- [ ] **1.8** Rate limit — **devam ediyor.** Aktif sondaj iptal, kapsam kararı alındı
+      (ADR-0006). İki küçük ölçüm kaldı, aşağıda.
+
+      **Header ölçümü — boş sonuç, ama kayda değer bir bulgu.**
+      `curl -sS -D - -o /dev/null ... | grep -i -E 'ratelimit|retry-after|x-rate'` →
+      **hiçbir şey**. Ne `Retry-After`, ne `RateLimit-*`, ne `X-RateLimit-*`.
+      Sonucu: 3.4'teki backoff süresi **istemci tarafında hesaplanacak**, sunucudan
+      okunamayacak. Bedava gelen bilgi yoktu, kendimiz üreteceğiz.
+
+      **Belgelenen limit (ikinci el kaynak — birincil ToS sayfası doğrulanmadı):**
+      *"saniyede 5 istek, originating IP başına, 5 dakikalık ortalama üzerinden"*,
+      artı ayrı bir **frequency cap** maddesi: sürekli saniyede birkaç istek veya ani
+      sıçrama, API hesabının askıya alınma sebebi. İki cümle gerilimde — 5/s serbest
+      ama "sürekli birkaç/sn" cezalı. Okunuşu: **5/s bir tavandır, hedef değildir.**
+
+      **Kapsam belirsizliği çözüldü: limit IP başına.** 9.7'yi etkiliyor — Lambda'nın
+      dönen IP'leri ayrı kova demek, ama ev + iş aynı IP'den giderse aynı kova.
+      (Öncesinde iki çelişkili ifade vardı: unofficial docs "your IP", gerçek hata
+      metni "this application".)
+
+      **Aktif sondaj yapılmadı — bilinçli.** İki katmanlı gerekçe: (1) doküman sayıyı
+      ve kapsamı veriyor, (2) ADR-0006'dan sonra günlük istek ~5, yani limit bağlayıcı
+      bir kısıt değil. Sondajın bedeli sıfır değil: aşırı kullanım cezası hata kodu
+      **26 — "your API key has been banned"**. Riski olmayan aşamalar cevabı verdiği
+      için riskli aşamaya geçilmedi. Protokol → not 17 §2.
+
+      **`limit` parametresi ölçüldü — sayfalama semantiğini değiştiriyor.**
+
+      | İstek | `perPage` | `totalPages` | `total` | kayıt |
+      |---|---|---|---|---|
+      | `limit=20` | `20` | `500` | `10000` | 20 |
+      | `limit=100` | `100` | `100` | `10000` | 100 |
+
+      **1.5'in şüphesi doğrulandı:** `total: 10000` gerçek bir sayım değil, sabit bir
+      **tavan**. `totalPages = total / perPage`. İki farklı `limit` ile `total`
+      değişmiyor, `totalPages` değişiyor.
+
+      **`rank` üzerindeki sonucu kritik:** `perPage` artık sunucunun sabit bir özelliği
+      değil, **bizim gönderdiğimiz bir parametre**. 1.7'de "junior tuzağı" diye yazılan
+      *"`perPage`'i 20 diye sabit yazmak"* artık varsayımsal değil — sayfa boyutunu
+      değiştiren taraf biziz. Formül `@attr`'dan okunduğu sürece doğru kalır; sabit
+      yazılırsa config değiştiği gün **sessizce** bozulur.
+
+      **Kapsam kararı: top 100 → ADR-0006.** Günlük ~500 istek yerine ~5.
+      Seçilen yol tek istekle `limit=100` **değil**, hedef sayıya kadar sayfalama.
+      Gerekçe: `limit=100` ölçüldü ve bugün çalışıyor, ama doğruluğu kontrol
+      etmediğimiz bir sunucu parametresine bağlıyor — Last.fm `limit`'i kırparsa cevap
+      **sessizce kısa** gelir, hata fırlamaz. Hedef sayıya kadar döngü, sunucu
+      `perPage`'i ne yaparsa yapsın doğru çalışır. Ayrıca sayfalama kodu her koşuda
+      birkaç kez çalışır, yani ölü kod olmaz.
+
+      **ROADMAP revize edildi:** 3. adımda sayfalama alt adımı **hiç yoktu** — 3.9
+      olarak eklendi. Araya sokulmadı, sona eklendi: `3.7` başka dosyalardan referanslı
+      (not 11, PROGRESS 1.2), yeniden numaralamak o bağlantıları sessizce kırar.
+      **Numara bir kimliktir, sıra değildir** — ADR'lerin asla yeniden numaralanmama
+      gerekçesiyle aynı.
+
+      **Kalan iki ölçüm:**
+
+      1. **Pasif gecikme ölçümü** — 20 ardışık istek (not 17 §2, aşama 3 script'i).
+         Amacı limit bulmak değil: 3.2'deki `timeout` değerinin gerçek verisi.
+         Timeout'u tahminle koymak yaygın ve yanlış.
+      2. **Tarih parametresi testi** — ADR-0005 ve ADR-0006 *"`chart.getTopTracks`
+         tarih parametresi almıyor"* varsayımına dayanıyor ve bu **hâlâ ölçülmedi**;
+         iddia API dokümanına dayanıyor. Doğruysa backfill yalnızca raw katmandan
+         yapılabilir — yani ADR-0006'nın "kaçırılan gün kalıcı kayıptır" maddesi buna
+         bağlı. Test: bir tarih parametresi ekleyip cevabın değişip değişmediğine bakmak.
 
 ## Açık sorular
 

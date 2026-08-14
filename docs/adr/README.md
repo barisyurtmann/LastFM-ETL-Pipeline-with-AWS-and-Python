@@ -65,3 +65,4 @@ only upsides was not a real decision.
 | [0003](0003-use-uv-for-environment-and-dependency-management.md) | Use uv for environment and dependency management | Accepted |
 | [0004](0004-store-recorded-api-payloads-as-test-fixtures.md) | Store recorded API payloads as test fixtures | Accepted |
 | [0005](0005-define-the-data-grain-as-a-daily-chart-snapshot.md) | Define the data grain as a daily chart snapshot | Accepted |
+| [0006](0006-limit-ingestion-to-the-top-100-chart-positions.md) | Limit ingestion to the top 100 chart positions | Accepted |

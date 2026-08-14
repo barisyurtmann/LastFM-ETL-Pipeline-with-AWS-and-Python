@@ -191,6 +191,13 @@ eklenen süs değil, bu adımın **ana konusu**.
 | 3.6 | Rate limit'e saygı (throttle) | 1.8'de ölçülen limitin altında kalmak |
 | 3.7 | Structured logging: seviye, alan, secret maskeleme | Teşhis edilebilirlik |
 | 3.8 | Elle uçtan uca çağrı — gerçek veri geldiğini doğrula | Kâğıt üstünde çalışan kod tuzağı |
+| 3.9 | **Sayfalama:** hedef kayıt sayısına ulaşana kadar sayfa çek; sayfa boyutu `@attr`'dan okunur, koda gömülmez | Sunucunun `limit`'i sessizce kırpması; sayfa sayısını sabitlemek (ADR-0006) |
+
+> **3.9 neden sonda?** Çalıştırma sırası olarak 3.7'den önce gelir — sayfalama döngüsü
+> retry ve throttle'ın üstüne kurulur, loglama ve uçtan uca kontrol ondan sonra gelir.
+> Ama **numara bir kimliktir, bir sıra değildir**: `3.7` başka dosyalardan referanslı
+> (not 11 §, PROGRESS 1.2). Araya sokup yeniden numaralamak o bağlantıları sessizce
+> kırar. Aynı sebeple ADR'ler de asla yeniden numaralanmaz.
 
 **Bitti tanımı (§6'ya ek):**
 
@@ -200,6 +207,11 @@ eklenen süs değil, bu adımın **ana konusu**.
 - [ ] Kalıcı hatada retry **yapılmıyor** — bu da loglanıyor
 - [ ] Hiçbir log satırında API key yok
 - [ ] İstemci hiçbir dosyaya yazmıyor (sorumluluk sınırı testi)
+- [ ] Sayfa boyutu **hiçbir yerde sabit yazılmıyor** — `@attr.perPage`'den okunuyor
+- [ ] Hedef sayıya ulaşılmadan sayfalar biterse bu **hata olarak görünüyor**, sessizce
+      eksik veri dönmüyor
+- [ ] Bir sayfa başarısız olduğunda retry **o sayfaya** uygulanıyor, tüm çekim baştan
+      başlamıyor
 
 **ADR adayları:**
 
