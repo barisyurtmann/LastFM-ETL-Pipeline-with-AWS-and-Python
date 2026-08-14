@@ -29,6 +29,7 @@ Testi tek soru: **"Bu bilgi başka bir projede de geçerli mi?"**
 | [12](12-shell-basics.md) | Shell temelleri: operatörler, exit code, `export`/`source`, bash ↔ PowerShell | 1.4 |
 | [13](13-data-source-discovery.md) | Yeni veri kaynağı keşif protokolü: altı boyut, örnekleme, null'ın yüzleri | 1.5 |
 | [14](14-grain-and-fact-tables.md) | Grain belirleme protokolü, fact table türleri, anahtar seçimi, mixed grain | 1.6 |
+| [15](15-schema-design-and-field-elimination.md) | Şema tasarımı: alan eleme (4 sınav), null'ın yedi kılığı, tip seçimi, isimlendirme, ordinal materyalizasyonu | 1.7 |
 
 ---
 

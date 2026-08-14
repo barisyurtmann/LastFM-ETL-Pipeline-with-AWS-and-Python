@@ -11,17 +11,18 @@ Kural: bu dosya yalan söyleyebilir (güncellemeyi unutursan). `git log --onelin
 
 ---
 
-**Last updated:** 2026-08-12
+**Last updated:** 2026-08-13
 **Current step:** 1 — Veriyi tanı ([plan](ROADMAP.md#adım-1--veriyi-tanı))
-**Next sub-step:** 1.7 — Hedef şema taslağı (tablo hâlinde, kod değil)
+**Next sub-step:** 1.8 — Rate limit ölçümü (Adım 1'in son alt adımı)
 
 > **ADIM 0 TAMAMLANDI.** Bitti tanımının beş maddesi de doğrulandı (aşağıda).
-> **1.1, 1.2, 1.3, 1.4, 1.5, 1.6 TAMAMLANDI.**
+> **1.1, 1.2, 1.3, 1.4, 1.5, 1.6, 1.7 TAMAMLANDI.**
 
-**1.7'nin girdisi — 1.6'da karara bağlanan grain:**
-`(snapshot_date, artist_name, track_name)`. Hedef şema tablosu bu anahtarın etrafında
-kurulacak. 1.7'ye devredilen üç açık konu aşağıda (rank alanı, `artist.mbid`, sayfa
-kayması).
+**1.8'in girdisi — 1.7'de karara bağlanan hedef şema:** 11 kolon, 4 alan gerekçeli
+reddedildi. Tablo aşağıda. Adım 5'in (transform) sözleşmesi budur.
+
+**Adım 1'in bitti tanımından kalan tek madde:** "Rate limit davranışı tahmin değil,
+ölçüm" → 1.8. Diğer beş madde karşılandı.
 
 **Adım 1 hatırlatması:** bu adımın çıktısı kod değil, **bilgi ve örnek dosya**. Kod yazma
 isteği gelirse Adım 3'e aittir.
@@ -300,6 +301,102 @@ isteği gelirse Adım 3'e aittir.
       dimension savunulabilir — ama ROADMAP'te sanatçı özniteliği isteyen sorgu yok, ikinci
       tablo yazma yolunu ve idempotency yüzeyini ikiye katlar. Denormalize kalıyor.
 
+- [x] **1.7** Hedef şema karara bağlandı. Not 15 yazıldı. 1.6'nın iki borcu kapandı.
+
+      **Tablo:** `lastfm_chart_top_tracks_daily`
+      **Grain:** bir satır = bir UTC gününde chart'ta görünen bir parçanın o andaki durumu
+      **PK:** `(snapshot_date, artist_name, track_name)` — **Partition:** `snapshot_date`
+
+      | # | kolon | kaynak yol | tip | null? | gerekçe |
+      |---|---|---|---|---|---|
+      | 1 | `snapshot_date` | *türetilmiş* `datetime.now(timezone.utc).date()` | `date` | hayır | Anahtar bileşeni + partition. ADR-0005. |
+      | 2 | `rank` | *türetilmiş* `(page-1)*perPage + i + 1` | `int32` | hayır | Sıra hiçbir kolondan geri hesaplanamaz — ölçüldü. |
+      | 3 | `artist_name` | `track.artist.name` | `string` | hayır | Anahtar bileşeni. |
+      | 4 | `track_name` | `track.name` | `string` | hayır | Anahtar bileşeni. |
+      | 5 | `playcount` | `track.playcount` (str→int) | `int64` | hayır | Kümülatif sayaç. Günlük artış = iki snapshot farkı. |
+      | 6 | `listeners` | `track.listeners` (str→int) | `int64` | hayır | Kümülatif. `playcount >= listeners` 39/39 doğrulandı. |
+      | 7 | `duration_seconds` | `track.duration` (str→int), **`0 → NULL`** | `int32` | evet | 0 = "bilinmiyor". 1.5'in açık sorusu kapandı. |
+      | 8 | `track_mbid` | `track.mbid` — anahtar yoksa `None` | `string` | evet | 4/19 kayıtta anahtar **yok**. `.get()` şart. |
+      | 9 | `artist_mbid` | `track.artist.mbid` — anahtar yoksa `None` | `string` | evet | Yeniden adlandırma tespitinin tek yolu. |
+      | 10 | `track_url` | `track.url` | `string` | hayır | %100 türetilemiyor (35/39). Doğrulama linki. |
+      | 11 | `ingested_at` | *türetilmiş* `datetime.now(timezone.utc)` | `timestamp[us, UTC]` | hayır | `snapshot_date`'ten ayrı. ADR-0005. |
+
+      **Reddedilenler — dördü de gerekçeli:**
+
+      | Alan | Sınav | Ölçüm |
+      |---|---|---|
+      | `streamable.#text`, `streamable.fulltrack` | Varyans | 39/39 kayıtta `{"#text":"0","fulltrack":"0"}`. Sıfır entropi. |
+      | `image[]` (4 boyut) | Varyans | **156 URL → 4 tekil**, hepsi Last.fm placeholder'ı (`2a96cbd8...`). Non-null, dolu, tamamen boş. |
+      | `artist.url` | Fonksiyonel bağımlılık | `artist_name`'den 39/39 üretilebildi. |
+      | `@attr.page/perPage/totalPages/total` | Taşıma mekaniği | `rank`'in **girdisi**, sonucu değil. Raw'da kalır. |
+
+      **1.6'nın birinci borcu kapandı — `rank` nasıl türetilecek.**
+      Sıralama payload'da **hiçbir alanda yok** ve hiçbir alandan türetilemiyor. Ölçüm:
+
+      | | idx 0 | idx 1 | idx 4 |
+      |---|---|---|---|
+      | page=1 `playcount` | 1.114.096 | 13.320.589 | 15.482.186 |
+      | page=500 `playcount` | — | 3.531.260 | 7.681.594 |
+
+      `playcount` da `listeners` da azalan sıralı **değil** — üstelik 500. sayfadaki bir
+      parçanın `playcount`'u 1. sayfadakinden 7 kat büyük olabiliyor. Yani chart'ın
+      sıralama ölçütü response'ta yok. **Bunun sonucu:** `ROW_NUMBER() OVER (ORDER BY
+      playcount DESC)` ile sorgu anında türetme alternatifi **ölçümle elendi**; `rank`
+      materyalize edilmek zorunda.
+
+      Formül: `rank = (int(attr["page"]) - 1) * int(attr["perPage"]) + index + 1`
+
+      **Global `enumerate` yanlış.** Son sayfa 20 değil **19** kayıt döndü (ölçüldü);
+      sayfaları birleştirip baştan numaralandıran kod, eksik dönen her sayfadan sonra tüm
+      sıraları bir kaydırır. Her sayfa kendi `@attr.page`'i ile hesaplanmalı.
+
+      **Adım 4'e yazılan borç:** `rank` transform'da hesaplanabilir **ama yalnızca** raw
+      katman (1) her sayfayı kendi kaydı olarak, birleştirmeden ve (2) `@attr`'ı atmadan
+      saklarsa. Raw bunlardan birini yaparsa `rank` kalıcı olarak kurtarılamaz.
+      4.x'te "@attr metadata, veri değil" deyip atmak çok doğal görünecek — görünmesin.
+
+      **1.6'nın ikinci borcu kapandı — `artist.mbid` ölçüldü.**
+
+      | | page=1 | page=500 |
+      |---|---|---|
+      | `artist.mbid` dolu | 20/20 | 18/19 (1 kayıtta anahtar yok) |
+      | `track.mbid` dolu | 20/20 | **15/19** |
+
+      Yani `artist_mbid`, anahtar olarak seçilen `track_mbid`'den **daha eksiksiz**.
+      Barış önce "bunu saklamak bir şey kazandırmaz" dedi; ölçüm bunu çürüttü.
+      Saklanma gerekçesi: ADR-0005'te **bilerek kabul edilen** tek zayıflık — sanatçı adı
+      değişirse geçmiş satırların eski adı taşıması — yalnızca bu alanla fark edilebilir.
+      Onsuz "Kanye West" ve "Ye" sonsuza kadar iki ayrı sanatçıdır ve bu geriye dönük
+      olarak tespit **bile edilemez**. **Kalıyor.**
+
+      **`track_url` — burada ben (Claude) yanıldım, ölçüm düzeltti.**
+      "url zaten `artist_name` + `track_name`'den türetilebilir, atılmalı" dedim. Test:
+
+      ```
+      quote_plus ile yeniden üretilebilen: 35 / 39
+      ```
+
+      Tutmayan 4 kayıt: Last.fm `(` `)` `$` `,` karakterlerini kaçırmıyor, `quote_plus`
+      kaçırıyor. Yani url **Last.fm'in kendi encode kurallarını** taşıyor, RFC'nin değil.
+      Türetseydik kayıtların ~%10'unda **sessizce** kırık link üretirdik. **Saklanıyor** —
+      ADR-0005'in "url normal kolon olarak kalır" kararıyla da tutarlı.
+
+      **`duration_seconds` için `0 → NULL` kabul edildi.** Gerekçe: belirsizliği veri
+      katmanında bir kere çözmek. 0'ı olduğu gibi saklarsan o kolona dokunan *her* sorgu
+      `WHERE duration > 0` filtresini hatırlamak zorunda kalır ve biri unutur.
+
+      **Tip kararlarının gerekçeleri** (detay → not 15 §3): `playcount`/`listeners` →
+      `int64` çünkü kaynağın kümülatif sayacı, tavanını biz belirlemiyoruz ve Parquet
+      encoding sonrası dar tip yer kazandırmıyor, sadece sessiz taşma riski veriyor.
+      `duration_seconds` → `int32`, burada dar tip **kasıtlı bir üst sınır ifadesi**.
+      `snapshot_date` → `date`, `timestamp` değil: **tip, grain'i ifade eden bir
+      sözleşmedir**. Hiçbir kolonda `category` yok — `artist_name` kardinalitesi page=1'de
+      6/20, page=500'de 19/19; tek örnekten kategori tipi seçmek klasik hata.
+
+      **`NOT NULL` bir alarm olarak konuldu**, tahmin olarak değil: anahtar bileşenleri ve
+      ölçüler boş gelirse **yazma patlamalı**. Bozuk veri erken ve gürültülü patlamalı,
+      geç ve sessiz değil.
+
 ## Açık sorular
 
 - Build backend `setuptools` seçildi; `uv` bir build backend değil (resolver + paket
@@ -310,12 +407,17 @@ isteği gelirse Adım 3'e aittir.
   `.python-version` ile sabitlenecek. Şimdilik bilinçli olarak eklenmedi.
 - Adım 8.5'te CI'da `uv`'nin **kendi sürümü** sabitlenecek. Bağımlılıkları kilitleyip
   aracı kilitlememek, "kendiliğinden bozulan build" riskini açık bırakır.
-- **`rank` alanı payload'da yok.** Chart verisinin en değerli bilgisi sıralama ve hiçbir
-  alanda durmuyor — yalnızca **dizinin sırası** taşıyor
-  (`rank = (page-1)*perPage + index + 1`). Yani JSON dizisinin sırası veri. Transform'da
-  sıra bozulursa bilgi kaybolur. Türetilecek mi, nasıl? → 1.7.
-- **`artist.mbid` ölçülmedi.** 1.5 orada boş değer gördüğünü söylüyor; track `mbid`'inde
-  "boş" ifadesinin yanlış çıktığı göz önüne alınırsa bu da ölçülmeli. → 1.7.
+- **Chart'ın sıralama ölçütü bilinmiyor.** 1.7'de ölçüldü: sıra ne `playcount` ne
+  `listeners` ile uyumlu, 500. sayfada 1. sayfadan büyük `playcount`'lar var. Yani chart
+  muhtemelen **son dönem** aktivitesine göre sıralı, `playcount` ise **tüm zamanlar**
+  kümülatif. Aynı satırda iki farklı zaman semantiği taşınıyor. Bu bir hata değil ama
+  analiz yapılırken (`rank` ile `playcount` birlikte yorumlanırken) bilinmesi gerek.
+  Doğrulanamaz — Last.fm ölçütü belgelemiyor. Şema notu olarak kalsın.
+- **`rank` bazı SQL lehçelerinde ayrılmış kelime.** Athena/Presto'da `RANK()` bir pencere
+  fonksiyonu. Kolon adı olarak sorun çıkarırsa `chart_rank`'e dönülecek. → 9.x'te test.
+- **Adım 4'e devredilen borç:** raw katman her sayfayı **ayrı** ve `@attr` ile birlikte
+  saklamak zorunda; aksi halde `rank` kalıcı olarak kurtarılamaz hale gelir. Bu bir
+  "açık soru" değil, unutulması muhtemel bir **kısıt**. → 4.x.
 - **Aynı gün içinde sayfa kayması.** Chart sayfalar çekilirken yeniden sıralanırsa aynı
   parça iki sayfada görünebilir ve anahtar tek `snapshot_date` içinde çakışır. Gözlenmedi
   (iki fixture farklı sayfalar, kesişim yok) ama çürütülmedi de. → 4.5 / 5.8.
