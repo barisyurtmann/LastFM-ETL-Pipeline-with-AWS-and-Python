@@ -66,3 +66,5 @@ only upsides was not a real decision.
 | [0004](0004-store-recorded-api-payloads-as-test-fixtures.md) | Store recorded API payloads as test fixtures | Accepted |
 | [0005](0005-define-the-data-grain-as-a-daily-chart-snapshot.md) | Define the data grain as a daily chart snapshot | Accepted |
 | [0006](0006-limit-ingestion-to-the-top-100-chart-positions.md) | Limit ingestion to the top 100 chart positions | Accepted |
+| [0007](0007-adopt-dlt-for-extraction-and-raw-loading.md) | Adopt dlt for extraction and raw loading | Accepted |
+| [0008](0008-transform-with-dbt-on-duckdb.md) | Transform with dbt on DuckDB instead of Python | Accepted |

@@ -11,25 +11,69 @@ Kural: bu dosya yalan söyleyebilir (güncellemeyi unutursan). `git log --onelin
 
 ---
 
-**Last updated:** 2026-08-13
-**Current step:** 1 — Veriyi tanı ([plan](ROADMAP.md#adım-1--veriyi-tanı))
-**Next sub-step:** 1.8 — **devam ediyor**, iki ölçüm kaldı (pasif gecikme + tarih
-parametresi testi). Bitince Adım 1 kapanır.
+**Last updated:** 2026-08-15
+**Current step:** A — Extract + raw load (dlt) ([plan](ROADMAP.md#adım-a--extract--raw-load-dlt))
+**Next sub-step:** A.1 — dlt'nin modeli: source / resource / destination / pipeline / state
 
-> **ADIM 0 TAMAMLANDI.** Bitti tanımının beş maddesi de doğrulandı (aşağıda).
-> **1.1, 1.2, 1.3, 1.4, 1.5, 1.6, 1.7 TAMAMLANDI. 1.8 devam ediyor.**
+> **ADIM 0 TAMAMLANDI.** **ADIM 1 TAMAMLANDI** (1.1–1.8).
 
-**Kapsam değişti — ADR-0006:** günlük çekim **top 100 sıra**, 10000 değil. Tek istekle
-`limit=100` değil, **hedef sayıya kadar sayfalama**. Günlük istek ~500 → ~5.
-Bu karar 3.9'u (yeni), 4.x'i (sayfa başına raw kayıt) ve 9.7'yi etkiliyor.
+### Sıradaki oturumda ilk iş
 
-**Adım 1'in bitti tanımından kalan madde:** "Rate limit davranışı tahmin değil, ölçüm".
-Kısmen karşılandı: header'lar ölçüldü (yok), belgelenen limit ve kapsamı alındı,
-`limit` parametresinin davranışı ölçüldü. Aktif sondaj **bilinçli olarak yapılmadı** —
-gerekçe 1.8'de.
+Bu blok, iki makine arasında geçiş yaparken tek bakılacak yerdir.
 
-**Adım 1 hatırlatması:** bu adımın çıktısı kod değil, **bilgi ve örnek dosya**. Kod yazma
-isteği gelirse Adım 3'e aittir.
+1. `git pull`
+2. Bu dosyayı ve `ROADMAP.md`'nin **Adım A** bölümünü oku. Plan tamamen değişti
+   (aşağıdaki revizyon bölümü) — eski 2/3/4/5 adımlarını arama, yoklar.
+3. Karar bekleyen tek şey: **önce `PROJECT_CONTEXT.md` düzeltmesi mi, doğrudan A.1 mi?**
+   (İkisi de yapılacak, sadece sıra seçilmedi.)
+
+**Açık işler:**
+
+| # | İş | Durum |
+|---|---|---|
+| 1 | `PROJECT_CONTEXT.md` §2 ve §4: ETL → ELT, mimari şemasına dlt/dbt/DuckDB | Yapılmadı. ADR-0008 bunu geçersiz kıldı. |
+| 2 | Repo adı `LastFM-ETL-...` → ELT | Yapılmadı. GitHub'da elle. |
+| 3 | 1.8 teyidi (opsiyonel, 2 dk) | `chart.getTopTracks`'e `&date=2020-01-01` ekleyip çıktı değişiyor mu bak. ADR-0006 "tarih parametresi yok" diyor ama bunun ölçüm mü okuma mı olduğu belirsiz. Sonuç C adımındaki backfill iptalinin dayanağı. |
+| 4 | ADR-0006'nın üç şartını dlt paginator'ına karşı doğrula | A.3'te yapılacak. Özellikle: "hedef sayıya ulaşmadan sayfalar biterse **hata**" — dlt bunu ifade edemiyorsa boşluk notlanacak. |
+| 5 | `PROGRESS.md`'nin "Tamamlananlar" geçmişi | Budanmadı, karar Barış'ta. |
+
+**Kurulu olmayanlar:** `dlt` ve `dbt-duckdb` henüz bağımlılık olarak eklenmedi.
+A.1 bir okuma/anlama adımı — kurulum A.2'de.
+
+---
+
+## ROADMAP REVİZYONU — 2026-08-15
+
+Plan araç-merkezli tek tura çevrildi. 9 adım → 5 adım (A–E).
+
+| | Önce | Sonra |
+|---|---|---|
+| Extract + raw | Elle `requests` client, retry, backoff, sayfalama, atomic write (adım 2, 3, 4) | **dlt** — `rest_api` source + `filesystem` destination (adım A) |
+| Transform | Pydantic + pandas (adım 5) | **dbt-duckdb** — staging + mart + veri testleri (adım B) |
+| Mimari | ETL | **ELT** |
+| İptal | — | CLI/backfill, mypy strict, pre-commit, Docker, Glue Crawler |
+
+Gerekçeler: ADR-0007 (dlt), ADR-0008 (dbt + ELT). Eski numaraların nereye gittiği
+`ROADMAP.md`'deki eşleme tablosunda — eski numaralar **yeniden kullanılmadı**.
+
+**Bu revizyonun bedeli, açıkça:** elle HTTP client, retry ve atomic write yazma
+pratiği feda edildi. Karşılığı Adım 1'in ölçümleri + A.3/A.6'da dlt'nin davranışını
+inceleme. Takas bilinçli, bedava değil.
+
+**Notlar ve ADR'ler kısılmadı.** Her adımda tam yazılıyor. Değişen tek şey:
+uygulamadan önce yazılan notlar kaynak etiketi taşıyacak —
+`> Kaynak: ÖLÇÜLDÜ (tarih)` veya `> Kaynak: OKUNDU — henüz uygulanmadı`.
+Gerekçe: `PROJECT_CONTEXT.md` bir süre "hatada HTTP 200 döner" diyordu; okunmuş
+bilgi notta ölçülmüş gibi durursa aynı hata tekrarlanır.
+
+**Adım 1 kapanışı — 1.8:** rate limit ölçümü tamamlandı (header yok, belgelenen limit
+5 istek/sn, `limit` parametresinin davranışı ölçüldü, aktif sondaj bilinçli olarak
+yapılmadı). Tarih parametresi sorusu ADR-0006'da zaten kapalı: `chart.getTopTracks`
+tarih parametresi kabul etmiyor → **API'den backfill imkânsız**, geçmiş yalnızca
+ileriye doğru birikir. Bu, C adımındaki CLI/backfill iptalinin de gerekçesi.
+
+**Bekleyen düzeltme:** `PROJECT_CONTEXT.md` ve repo adı hâlâ "ETL" diyor. ADR-0008
+bunu geçersiz kıldı. A.1'den önce düzeltilecek.
 
 ---
 

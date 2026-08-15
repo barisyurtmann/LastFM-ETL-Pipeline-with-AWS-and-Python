@@ -16,16 +16,47 @@ neye bağımlı.
 
 ---
 
+## REVİZYON — 2026-08-15: araç-merkezli tek tur
+
+Bu dosyanın önceki hâli **9 adımdı ve her katmanı elle yazmayı** öngörüyordu:
+kendi retry döngüsü, kendi sayfalama mantığı, kendi atomic write'ı, Pydantic ile
+kendi transform'u.
+
+**Neden değişti.** Adım 1'de veri davranışı elle ölçüldü (hata kodları, rate limit,
+`limit` parametresinin kırpması, şema derinliği). O bilgi bankaya yazıldı — ADR-0004,
+0005, 0006 ve notlar 11, 13, 14, 15, 17'de duruyor. Aynı davranışların *kodunu* elle
+yazmak yeni bilgi üretmiyor, sadece süre harcıyor. Sektörde bu katman zaten elle
+yazılmıyor: extract + raw load için **dlt**, transform için **dbt** kullanılıyor.
+
+**Ne değişmedi.** Kararların gerekçesi. Her araç, çözdüğü problem üzerinden
+anlatılacak — "dlt kurduk, çalıştı" değil, "1.8'de ölçtüğüm rate limit davranışını
+dlt şu şekilde ele alıyor, benim yazacağımdan şu yönden farklı".
+
+**Mimari sonucu:** proje **ETL'den ELT'ye** döndü. Transform artık ayrı bir Python
+katmanında değil, sorgu motorunun (DuckDB → Athena) içinde SQL olarak yaşıyor.
+Gerekçe: ADR-0008.
+
+### Numaralandırma
+
+Eski adım numaraları (0–9) ve alt adımları **yeniden kullanılmadı**. Notlar ve
+PROGRESS bu numaralara referans veriyor; aynı numarayı yeni bir içeriğe vermek o
+referansları sessizce yalancı yapardı. Yeni adımlar bu yüzden **harf** aldı: A–E.
+Eski numaraların nereye gittiği aşağıdaki eşleme tablosunda.
+
+Bu, ADR'lerin asla yeniden numaralanmaması kuralının aynısı: **numara bir kimliktir,
+bir sıra değildir.**
+
+---
+
 ## Kurallar
 
-- **Tek seferde tek alt adım.** 3.4 bitmeden 3.5'e geçilmez.
+- **Tek seferde tek alt adım.** A.3 bitmeden A.4'e geçilmez.
 - Her adımın "bitti" tanımı, `PROJECT_CONTEXT.md` §6'daki **genel kontrol listesine ek**
-  şartlardır. Genel liste her adım için zaten geçerlidir.
-- **ADR numaraları burada verilmez.** ADR'ler yazıldıkları anda sıradaki numarayı alır.
-  Peşinen numara ayırmak, bir adım ADR üretmezse boşluk veya yeniden numaralandırma
-  demektir — `docs/adr/README.md`'nin açık ihlali. Burada sadece **ADR adayı konular**
-  listelenir; bir karar tartışıldıktan sonra ADR'ye değmezse yazılmaz, bu normaldir.
+  şartlardır.
+- **ADR numaraları burada verilmez.** Burada sadece ADR **adayı** konular listelenir.
 - Alt adım listesi kutsal değil. Gerçekle çelişirse liste değişir, gerçek değil.
+- **Her adımda not yazılır.** Araç kullanmak, notu atlamanın gerekçesi değil — tersine,
+  "bu araç benim yazacağım şeyi nasıl çözüyor" notu daha değerlidir.
 
 ---
 
@@ -33,428 +64,231 @@ neye bağımlı.
 
 ```mermaid
 graph LR
-    S0[0 Repo] --> S1[1 Veriyi tanı]
-    S1 --> S2[2 Config]
-    S2 --> S3[3 Extract]
-    S1 --> S3
-    S3 --> S4[4 Raw]
-    S1 --> S4
-    S4 --> S5[5 Transform]
-    S1 --> S5
-    S5 --> S6[6 Orkestrasyon]
-    S1 --> S7[7 Test]
-    S5 --> S7
-    S6 --> S7
-    S0 --> S8[8 Paketleme + CI]
-    S7 --> S8
-    S6 --> S9[9 AWS]
-    S8 --> S9
+    S1[1 Veriyi tanı ✔] --> A[A dlt: extract + raw]
+    A --> B[B dbt: transform + model]
+    B --> C[C Orkestrasyon]
+    C --> D[D Test + CI]
+    C --> E[E AWS]
+    D --> E
 ```
 
-Kritik yol: **1 → 3 → 4 → 5 → 6 → 9**. Adım 7 ve 8 kritik yolun dışında ama
-9'dan önce bitmelidir — test edilmemiş kodu buluta taşımak, hatayı en pahalı yerde
-bulmak demektir.
-
-| Adım | Neye muhtaç | Kime girdi verir |
-|---|---|---|
-| 0 | — | 1, 8 |
-| 1 | 0 | 2, 3, 4, 5, 7 |
-| 2 | 1 (hangi env değişkeni gerektiğini bilmek için) | 3 |
-| 3 | 1 (payload), 2 (api_key) | 4 |
-| 4 | 1 (grain, partition anahtarı), 3 (veri) | 5 |
-| 5 | 1 (şema), 4 (raw dosya) | 6, 7 |
-| 6 | 3, 4, 5 (çağıracak bir şey olmalı) | 7, 9 |
-| 7 | 1 (fixture payload), 5, 6 | 8 |
-| 8 | 0 (`pyproject.toml`), 7 (CI'da koşacak test) | 9 |
-| 9 | 6 (çalışan pipeline), 8 (paketleme) | — |
-
-**Adım 1'in özel konumu:** beş adıma birden girdi verir. Gerçek payload görülmeden
-şema, partition ve model kararları tahmine dayanır. Bu yüzden 1 atlanamaz ve
-"nasılsa API dokümanında yazıyor" denerek kısa geçilemez.
+Kritik yol: **A → B → C → E**. D kritik yolun dışında ama E'den önce bitmelidir —
+test edilmemiş kodu buluta taşımak, hatayı en pahalı yerde bulmaktır.
 
 ---
 
-## Adım 0 — Repo kurulumu
+## Eski numara eşlemesi
 
-**Amaç:** Kod yazmaya başlamadan önce, yanlış şeyin commit edilmesini yapısal olarak
-imkânsız kılmak.
-
-| # | Alt adım | Ne çözüyor |
+| Eski | Neydi | Yeni durum |
 |---|---|---|
-| 0.1 | `.gitignore` | Secret ve türev dosya sızıntısı |
-| 0.2 | İlk commit | Geri dönülebilir bir taban noktası |
-| 0.3 | `pyproject.toml` + `src/` layout | Paket kimliği, import yolu belirsizliği |
-| 0.4 | Sanal ortam (`uv` / `venv`) | "Bende çalışıyordu" problemi |
-| 0.5 | `README.md` + `.env.example` | Sözleşmeli config, projeye giriş kapısı |
-| 0.6 | Adım 0 kapanış commit'i | — |
+| 0.1–0.6 | Repo kurulumu | **Tamamlandı.** Değişmedi. |
+| 1.1–1.8 | Veriyi tanı | **Tamamlandı** (1.8 kapanışı hariç). Çıktısı bu revizyonun girdisi. |
+| 2.1–2.6 | pydantic-settings ile config | → **A.2.** `dlt.secrets` ile. Fail-fast ve secret sızıntısı konuları aynen duruyor, aracı değişti. |
+| 3.1–3.8 | Elle HTTP client, retry, backoff | → **A.3.** dlt `rest_api` source. Elle yazılmıyor, davranışı ölçülüp notlanıyor. |
+| 3.9 | Sayfalama | → **A.3.** dlt paginator. ADR-0006'nın top-100 kararı geçerli, uygulaması dlt'nin. |
+| 4.1–4.7 | Raw katman, path builder, atomic write | → **A.4.** dlt `filesystem` destination. Partition layout config'ten. |
+| 5.1–5.8 | Pydantic + pandas transform | → **B.** dbt modelleri (SQL). |
+| 6.1–6.8 | main.py, CLI, backfill, run_id | → **C.** Küçültüldü: CLI ve backfill iptal (gerekçe C'de). |
+| 7.1–7.7 | pytest | → **D.1–D.3.** Küçültüldü: transform testleri dbt testlerine devredildi. |
+| 8.1–8.8 | ruff, mypy, Makefile, pre-commit, CI, Docker | → **D.4–D.6.** mypy strict ve Docker **iptal** (gerekçe D'de). |
+| 9.1–9.11 | AWS | → **E.** Glue Crawler **iptal**, partition projection ile değiştirildi. |
+
+---
+
+## Adım A — Extract + raw load (dlt)
+
+**Amaç:** Last.fm'den veriyi çekip raw katmana yazmak — ve bunu yaparken, elle
+yazsaydım hangi problemleri çözmem gerekeceğini **aracın çözümü üzerinden** görmek.
+
+| # | Alt adım | Ne çözüyor / ne öğretiyor |
+|---|---|---|
+| A.1 | dlt'nin modeli: `source` / `resource` / `destination` / `pipeline` / `state` nedir | Aracın zihin haritası. Hangi kavram benim hangi elle-yazacağım parçama denk geliyor |
+| A.2 | Secret yönetimi: `.dlt/secrets.toml` vs env vs mevcut `.env` — hangisi, neden; git'e sızmaması | Eski 2.x'in özü. `.gitignore` sınavı ikinci kez |
+| A.3 | `rest_api` source: endpoint, `format=json`, paginator, ADR-0006'nın top-100 limiti | Eski 3.x. Retry/backoff/pagination dlt'de nasıl yapılandırılıyor, varsayılanları ne |
+| A.4 | `filesystem` destination: parquet mi jsonl mi, `layout` ile partition (`dt=`), local `data/` → `s3://` aynı config | Eski 4.x. Raw immutability ve partition şeması korunuyor mu |
+| A.5 | Yazma davranışı: `write_disposition` (`replace` / `append` / `merge`) — hangisi bizim grain'imize uyuyor | **İdempotency.** Eski 4.5'in aynısı, kararı dlt'ye devretmiyoruz |
+| A.6 | Hata yolu ölçümü: bozuk `api_key` ile pipeline çalıştır — dlt ne yapıyor, kaç kez deniyor, exit code ne | 1.3'te ölçtüğüm `403 + error:10` davranışının araç tarafındaki karşılığı |
+| A.7 | dlt'nin ürettiği `_dlt_*` metadata tabloları / kolonları: load_id, schema, state | Lineage ve incremental'ın altyapısı. Eski 4.6'nın hazır hâli |
+| A.8 | Uçtan uca: tek komut → `data/raw/` altında parquet dosyası. İki kez çalıştır, sonucu karşılaştır | Dar dilimin ilk yarısı + idempotency sınavı |
 
 **Bitti tanımı (§6'ya ek):**
 
-- [ ] `git status` temiz — hiçbir türev dosya (`__pycache__`, `.venv`, `*.egg-info`) görünmüyor
-- [ ] `git check-ignore -v` ile `.env` ve `data/` gerçekten ignore'lu olduğu doğrulandı
-- [ ] Paket temiz ortamda kurulabiliyor ve `python -c "import <paket>"` çalışıyor
-- [ ] `.env.example` var, gerçek `.env` yok — ikisi arasındaki anahtar listesi aynı
-- [ ] README bir yabancının repoyu klonlayıp çalıştırmasına yetiyor
+- [ ] `data/raw/` altında beklenen partition yolunda gerçek veri var
+- [ ] Peş peşe iki çalıştırma sonrası satır sayısı **bilinçli olarak** ya aynı ya artmış — hangisi olduğu ve neden olduğu yazılı
+- [ ] Bozuk `api_key` ile pipeline **gürültülü** başarısız oluyor, `echo $?` sıfır değil
+- [ ] Hiçbir log satırında ve hiçbir commit'te API key yok
+- [ ] Raw dosya yolu `s3://` yapısını birebir taklit ediyor
+- [ ] dlt'nin retry/pagination varsayılanları **okundu ve notlandı** — "çalışıyor" yeterli değil
 
 **ADR adayları:**
 
-- Use `src/` layout (0.3)
-- Choose `uv` over `venv` + `pip` — ya da tersi (0.4)
-- Package naming (0.3, ADR'ye değmeyebilir — küçük karar)
+- Adopt dlt for extraction and raw loading
+- Choose the raw file format and partition layout for the filesystem destination
+- Choose a write disposition for the raw layer
 
-**Bağımlılık:** Yok. Her şeyin başlangıcı.
+**Not adayları:** dlt'nin çalışma modeli · dlt state ve incremental loading · elle
+yazılan retry vs dlt'nin retry'ı (1.8 ölçümüyle karşılaştırma)
+
+**Bağımlılık:** 1 (grain, şema, rate limit ölçümü). B'ye girdi verir.
 
 ---
 
-## Adım 1 — Veriyi tanı
+## Adım B — Transform + veri modeli (dbt-duckdb)
 
-**Amaç:** Tek satır pipeline kodu yazmadan, gerçek veriyi elle görmek. Bu adımın
-çıktısı kod değil, **bilgi ve bir örnek dosya**.
+**Amaç:** Asıl hedef bu adım. Raw parquet'ten sorgulanabilir, test edilmiş, katmanlı
+bir veri modeli. Buradan sonrası (dbt + Snowflake) aynı kaslar.
 
-| # | Alt adım | Ne çözüyor |
+| # | Alt adım | Ne çözüyor / ne öğretiyor |
 |---|---|---|
-| 1.1 | Last.fm API key al, `.env`'e koy | Erişim; ve `.env`'in gerçekten ignore'lu olduğunun sınavı |
-| 1.2 | API'yi elle çağır (`curl` / `httpie`), `format=json` ile ve olmadan | XML tuzağını gözle görmek |
-| 1.3 | Bozuk `api_key` ile çağır | HTTP 200 + gövdede `error` davranışını **kendi gözünle** doğrulamak |
-| 1.4 | Gerçek payload'ı diske kaydet | Adım 7'nin fixture'ı; şema tartışmasının kanıtı |
-| 1.5 | Payload anatomisi: alan listesi, tipler, null'lar, iç içelik | Sayıların string geldiğini fark etmek |
-| 1.6 | **Grain kararı**: bir satır neyi temsil ediyor | Tüm transform bu cevaba dayanır |
-| 1.7 | Hedef şema taslağı (tablo hâlinde, kod değil) | Adım 5'in girdisi |
-| 1.8 | Rate limit'i ölç: ardışık istek, ne zaman kısılıyor | Adım 3'ün retry stratejisinin gerçek verisi |
+| B.1 | dbt projesi kurulumu: `profiles.yml`, `dbt_project.yml`, klasör yapısı — ve bunların repoda nereye gireceği | Proje düzeni. `src/` ile dbt yan yana nasıl durur |
+| B.2 | DuckDB'nin rolü: veriyi *tutmuyor*, parquet'i yerinde okuyor (`read_parquet`) | Lakehouse mantığının en küçük hâli. Neden ayrı bir ambar kurmuyoruz |
+| B.3 | `sources.yml`: raw parquet'i dbt'ye kaynak olarak tanıtmak, `freshness` | Data contract'ın ilk somut hâli |
+| B.4 | **staging** katmanı: `stg_top_tracks` — düzleştirme, tip çevrimi, isimlendirme kuralı | Eski 5.4. Medallion'ın bronze→silver'ı |
+| B.5 | **mart** katmanı: grain'i (ADR-0005) uygulayan fact tablosu + gerekiyorsa dimension | **Data modeling'in kendisi.** Fact/dimension, surrogate key, grain koruma |
+| B.6 | Materialization seçimi: `view` / `table` / `incremental` / `external` — hangisi nerede, maliyet farkı | Eski 5.6 + 5.7. `incremental` = idempotency'nin dbt'deki karşılığı |
+| B.7 | dbt testleri: `not_null`, `unique`, `accepted_values`, `relationships` + bir singular test | Eski 5.8 ve 7.3'ün yerini alıyor. Veri kalitesi kodun değil, modelin sorumluluğu |
+| B.8 | Dokümantasyon: model/kolon açıklamaları, `dbt docs generate`, lineage grafiği | Mülakat vitrini. Lineage'ı elle çizmiyoruz |
+| B.9 | İki kez `dbt build` → satır sayısı değişmiyor | Idempotency'nin model katmanındaki sınavı |
 
 **Bitti tanımı (§6'ya ek):**
 
-- [ ] En az bir gerçek payload dosyası repoda duruyor ve commit edildi
-- [ ] Hata payload'ı da kaydedildi (başarı yolu kadar değerli)
-- [ ] Grain tek cümleyle yazılabiliyor: "Bir satır = ..."
-- [ ] Hedef şema tablosu var: alan adı, kaynak yol, tip, nullable, açıklama
-- [ ] "Bu alan neden var / neden yok" sorusuna her alan için cevap verilebiliyor
-- [ ] Rate limit davranışı tahmin değil, ölçüm
-
-**Payload dosyası nereye?** `tests/fixtures/` mi `docs/samples/` mi — 1.4'te karara
-bağlanacak. Aynı dosyanın iki amacı var: insan okuyacak (doküman) ve test okuyacak
-(fixture). İki kopya tutmak sapma demektir.
+- [ ] `dbt build` temiz geçiyor ve **en az bir test kasten bozulup kırmızıya döndüğü görüldü**
+- [ ] Grain korunuyor: mart tablosunda birincil anahtar üzerinde `unique` testi geçiyor
+- [ ] Hiçbir sayısal alan string kalmadı — tipler bilinçli
+- [ ] Aynı günün `dbt build`'i iki kez koşunca satır sayısı artmıyor
+- [ ] Her modelin ve en az kritik kolonların `description`'ı var
+- [ ] staging ↔ mart sorumluluk sınırı yazılı: neye staging'de, neye mart'ta dokunulur
 
 **ADR adayları:**
 
-- Store a real API payload as the schema source of truth
-- Define the data grain for the first pipeline slice
+- Transform with dbt on DuckDB instead of Python (ETL → ELT)
+- Define the staging / mart layer boundary
+- Choose materializations per layer
 
-**Bağımlılık:** 0'a muhtaç (repo olmalı). 2, 3, 4, 5, 7'ye girdi verir.
+**Not adayları:** dbt'nin çalışma modeli (compile → run, ref, DAG) · staging/mart
+katmanlama · fact ve dimension tabloları · materialization türleri ve maliyeti ·
+dbt testleri vs pytest — hangisi neyi test eder
+
+**Bağımlılık:** A. C'ye girdi verir.
 
 ---
 
-## Adım 2 — Config
+## Adım C — Orkestrasyon
 
-**Amaç:** Ayarların koddan ayrılması ve **eksik ayarın çalışma zamanında değil,
-başlangıçta** patlaması.
+**Amaç:** İki aracı tek komuta bağlamak. Bu adım **ince** — iş mantığı A ve B'de.
 
 | # | Alt adım | Ne çözüyor |
 |---|---|---|
-| 2.1 | Neyin config olduğuna karar ver: env vs sabit | Her şeyi "esnek olsun diye" env yapma tuzağı |
-| 2.2 | `pydantic-settings` ile `Settings` sınıfı | Tip güvenliği + doğrulama |
-| 2.3 | `.env` okuma, `.env.example` senkronu | Sözleşmenin yazılı olması |
-| 2.4 | Import-time yan etkisi: modül seviyesinde `settings = Settings()` mi, factory mi | `import` edince patlayan modül problemi |
-| 2.5 | Eksik/bozuk env ile fail-fast doğrulaması | Sessiz `None` yerine gürültülü hata |
-| 2.6 | Secret'ın log ve traceback'e sızmaması (`SecretStr`) | API key'in log dosyasında bulunması |
+| C.1 | Runner'ın sorumluluğu: sırayla dlt pipeline + `dbt build`, hata yönetimi, başka bir şey değil | Şişen giriş dosyası |
+| C.2 | Kısmi başarısızlık: raw yazıldı, dbt patladı — sistem hangi durumda kalıyor | Yarım durum. A.5 ve B.6'nın sistem seviyesindeki sınavı |
+| C.3 | Exit code sözleşmesi (0 / 1) | Cron, CI ve EventBridge'in hatayı görmesi. **Geçmiş projenin öldüğü nokta** |
+| C.4 | Logging: `run_id`, seviye politikası, dlt ve dbt loglarının nereye gittiği | Bir koşuyu loglardan izleyebilmek |
+| C.5 | Uçtan uca: tek komut → API'den mart tablosuna. İki kez çalıştır, aynı sonuç | **Projenin kanıtı** |
+
+**İptal edilenler ve gerekçesi:**
+
+- **CLI (`--date`, `--dry-run`)** — `chart.getTopTracks` tarih parametresi almıyor
+  (1.8'de ölçülüyor), yani `--date` ile API'den geçmiş çekilemez. Argparse/typer
+  öğrenmek bu projenin konusu değil.
+- **Backfill döngüsü** — aynı sebep. Geçmiş sadece ileriye doğru birikir. Raw'ı
+  yeniden işlemek zaten `dbt build`.
 
 **Bitti tanımı (§6'ya ek):**
 
-- [ ] `.env` silinip program çalıştırıldığında **açık ve tek bir hata** veriyor
-- [ ] Hata mesajı hangi değişkenin eksik olduğunu söylüyor
-- [ ] `print(settings)` ve traceback çıktısında API key görünmüyor
-- [ ] `.env.example` içindeki anahtar seti `Settings` alanlarıyla birebir aynı
-- [ ] Test kodu gerçek `.env` olmadan da config üretebiliyor
+- [ ] **Tek komut** temiz bir makinede API'den mart tablosuna kadar gidiyor
+- [ ] Pipeline patladığında `echo $?` sıfırdan farklı — bilerek bozulup denendi
+- [ ] "Başarılı" logu, iş gerçekten yapıldıktan **sonra** yazılıyor
+- [ ] Tek koşunun log satırları ortak bir `run_id` taşıyor
 
-**ADR adayları:**
+**ADR adayları:** Keep the entrypoint thin: orchestration only · Define the exit code contract
 
-- Use pydantic-settings for configuration
-- Load settings lazily instead of at import time
-
-**Bağımlılık:** 1'e muhtaç (hangi ayarların gerektiğini bilmeden config yazılmaz).
-3'e girdi verir.
+**Bağımlılık:** A, B. D ve E'ye girdi verir.
 
 ---
 
-## Adım 3 — Extract client
+## Adım D — Test + CI
 
-**Amaç:** Ağın güvenilmez olduğunu varsayan bir istemci. Hata yönetimi sonradan
-eklenen süs değil, bu adımın **ana konusu**.
-
-| # | Alt adım | Ne çözüyor |
-|---|---|---|
-| 3.1 | İstemcinin sorumluluk sınırı: ne yapar, ne **yapmaz** (disk yazmaz, transform etmez) | Tanrı-sınıf tuzağı |
-| 3.2 | `requests.Session` + `timeout` | Sonsuza kadar asılı kalan istek |
-| 3.3 | Gövdedeki `error` kontrolü → özel exception hiyerarşisi | Last.fm'in HTTP 200 yalanı |
-| 3.4 | Retry + exponential backoff + jitter | Geçici ağ hatası; thundering herd |
-| 3.5 | Hangi hata retry'lanır, hangisi **asla** (401/invalid key vs 429/5xx) | Boşuna 5 kez denenen kalıcı hata |
-| 3.6 | Rate limit'e saygı (throttle) | 1.8'de ölçülen limitin altında kalmak |
-| 3.7 | Structured logging: seviye, alan, secret maskeleme | Teşhis edilebilirlik |
-| 3.8 | Elle uçtan uca çağrı — gerçek veri geldiğini doğrula | Kâğıt üstünde çalışan kod tuzağı |
-| 3.9 | **Sayfalama:** hedef kayıt sayısına ulaşana kadar sayfa çek; sayfa boyutu `@attr`'dan okunur, koda gömülmez | Sunucunun `limit`'i sessizce kırpması; sayfa sayısını sabitlemek (ADR-0006) |
-
-> **3.9 neden sonda?** Çalıştırma sırası olarak 3.7'den önce gelir — sayfalama döngüsü
-> retry ve throttle'ın üstüne kurulur, loglama ve uçtan uca kontrol ondan sonra gelir.
-> Ama **numara bir kimliktir, bir sıra değildir**: `3.7` başka dosyalardan referanslı
-> (not 11 §, PROGRESS 1.2). Araya sokup yeniden numaralamak o bağlantıları sessizce
-> kırar. Aynı sebeple ADR'ler de asla yeniden numaralanmaz.
-
-**Bitti tanımı (§6'ya ek):**
-
-- [ ] Bozuk API key ile çağırınca **exception fırlıyor** — boş dict dönmüyor
-- [ ] Hata sınıfları ayrık: auth hatası ile geçici ağ hatası aynı `except`'e düşmüyor
-- [ ] Retry'ın gerçekten beklediği log çıktısında görülüyor (deneme no + bekleme süresi)
-- [ ] Kalıcı hatada retry **yapılmıyor** — bu da loglanıyor
-- [ ] Hiçbir log satırında API key yok
-- [ ] İstemci hiçbir dosyaya yazmıyor (sorumluluk sınırı testi)
-- [ ] Sayfa boyutu **hiçbir yerde sabit yazılmıyor** — `@attr.perPage`'den okunuyor
-- [ ] Hedef sayıya ulaşılmadan sayfalar biterse bu **hata olarak görünüyor**, sessizce
-      eksik veri dönmüyor
-- [ ] Bir sayfa başarısız olduğunda retry **o sayfaya** uygulanıyor, tüm çekim baştan
-      başlamıyor
-
-**ADR adayları:**
-
-- Treat HTTP 200 with an error body as a failure
-- Define a retry policy: which errors are retried and which are not
-- Define the exception hierarchy for the extract layer
-
-**Bağımlılık:** 1 (payload ve hata şekli) + 2 (api_key) gerekli. 4'e girdi verir.
-
----
-
-## Adım 4 — Raw katman
-
-> ⚠️ **Bu adımın alt adımları Adım 1'de gerçek payload görüldükten sonra revize
-> edilecek.** Partition anahtarı, dosya adlandırması ve manifest içeriği payload'ın
-> gerçek şekline bağlıdır. Aşağıdaki liste bir taslaktır, sözleşme değil.
-
-**Amaç:** API'den geleni **hiç dokunmadan** kalıcı hâle getirmek. Raw katmanın tek
-işi: transform yanlış yazıldığında API'yi tekrar çağırmak zorunda kalmamak.
+**Amaç:** Kalite kontrolünü insan disiplininden makineye devretmek — ama sadece
+gerçekten değer üreten kısmını.
 
 | # | Alt adım | Ne çözüyor |
 |---|---|---|
-| 4.1 | Raw'ın sözleşmesi: neye dokunulmaz, neden | "Küçük bir temizlik yapayım" tuzağı |
-| 4.2 | Partition şeması ve dosya yolu (`method=`, `dt=`) | Sorgu maliyeti; S3 uyumu |
-| 4.3 | Yol üretimini tek yerden yapmak (path builder) | Yol mantığının koda dağılması |
-| 4.4 | Yazma stratejisi: atomic write (`tmp` → `rename`) | Yarım yazılmış dosya |
-| 4.5 | İdempotency: aynı gün iki kez çalışınca ne olur — overwrite mi, skip mi, hata mı | Çift kayıt / veri kaybı |
-| 4.6 | Metadata: `ingested_at`, kaynak URL, API parametreleri | Altı ay sonra "bu dosya nereden geldi" |
-| 4.7 | Uçtan uca: `extract → raw dosya` | İlk gerçek dilim |
+| D.1 | Test sorumluluk bölüşümü: neyi dbt test eder, neyi pytest | Aynı şeyi iki yerde test etme israfı |
+| D.2 | pytest: 1.4'teki fixture'larla dlt source'un şema/parse davranışı | Elimde duran fixture'lar boşa gitmesin |
+| D.3 | Hata yolu testi: bozuk payload / bozuk key | Sadece mutlu yolu test etme tuzağı |
+| D.4 | `ruff` (lint + format), `pyproject.toml` konfigürasyonu | Stil tartışması; sessiz buglar |
+| D.5 | `Makefile` — `make run`, `make test`, `make lint` | "Hangi komutla çalışıyordu" |
+| D.6 | GitHub Actions: `uv sync` → ruff → pytest → `dbt build` (fixture verisiyle) | "Bende çalışıyor" |
+| D.7 | README'yi portfolyo kalitesine çıkar: mimari şeması, çalıştırma, dlt/dbt gerekçesi | Mülakat vitrini |
 
-**Bitti tanımı (§6'ya ek):**
+**İptal edilenler ve gerekçesi:**
 
-- [ ] Yazılan JSON, API'nin döndürdüğüyle **byte düzeyinde** karşılaştırılabiliyor
-- [ ] Peş peşe iki çalıştırma sonrası `data/raw/` altında beklenen dosya sayısı var
-      (ne fazla, ne eksik) — ve bu bilinçli bir karardı
-- [ ] Yazma ortasında süreç öldürülürse geride `.tmp` kalıyor, bozuk `.json` kalmıyor
-- [ ] Dosya yolu local'de `s3://` yapısını birebir taklit ediyor
-- [ ] Yol bir fonksiyondan üretiliyor, string birleştirmesi koda dağılmamış
-
-**ADR adayları:**
-
-- Keep the raw layer immutable
-- Choose the raw partition scheme (`method=` / `dt=`)
-- Define idempotent write semantics for the raw layer
-- Write files atomically via temp-then-rename
-
-**Bağımlılık:** 1 (partition anahtarı hangi alandan gelecek) + 3 (veri) gerekli.
-5'e girdi verir.
-
----
-
-## Adım 5 — Transform
-
-> ⚠️ **Bu adımın alt adımları Adım 1'de gerçek payload görüldükten sonra revize
-> edilecek.** Model alanları, tip dönüşümleri ve kalite kontrolleri gerçek şemaya
-> bağlıdır. Aşağıdaki liste bir taslaktır, sözleşme değil.
-
-**Amaç:** Ham JSON'dan sorgulanabilir Parquet'e. Bu katman **saf** olmalı: girdi veri,
-çıktı veri, arada I/O yok — bu yüzden test etmesi en kolay, en çok değer veren katman.
-
-| # | Alt adım | Ne çözüyor |
-|---|---|---|
-| 5.1 | Saf fonksiyon sınırı: dosya okuma/yazma transform'un işi değil | Test edilemez kod |
-| 5.2 | Pydantic modelleriyle şema doğrulama | Sessizce değişen API |
-| 5.3 | Bozuk kayıt politikası: fail-fast mi, kaydı ayır mı (quarantine) | Tek bozuk satır yüzünden düşen pipeline / sessizce kaybolan veri |
-| 5.4 | Düzleştirme + tip dönüşümü (string sayılar, unix timestamp, boş string vs null) | 1.5'te görülen gerçek tuzaklar |
-| 5.5 | Audit sütunları: `ingestion_date`, `source_file` | Köken takibi (lineage) |
-| 5.6 | Parquet yazımı: engine, sıkıştırma, dosya boyutu | Küçük dosya problemi; Athena maliyeti |
-| 5.7 | Curated katmanda idempotent yazma (partition overwrite) | Yeniden çalıştırınca çiftlenen satırlar |
-| 5.8 | Veri kalitesi kontrolleri: satır sayısı, null oranı, tekillik | Sessiz veri kaybını yakalamak |
-
-**Bitti tanımı (§6'ya ek):**
-
-- [ ] Transform fonksiyonları hiçbir dosyaya dokunmuyor — sadece veri alıp veri döndürüyor
-- [ ] Bozuk/eksik alanlı payload verildiğinde davranış **bilinçli ve belgelenmiş**
-      (patlıyor ya da ayırıyor — ama sessizce atlamıyor)
-- [ ] Parquet dosyası okunup satır sayısı ve tipler doğrulandı
-- [ ] Aynı günün transform'u iki kez koşturulunca satır sayısı **artmıyor**
-- [ ] Grain korunuyor: birincil anahtar üzerinde çift kayıt yok
-- [ ] Her sütunun tipi bilinçli seçildi — hiçbir sayısal alan `object` değil
-
-**ADR adayları:**
-
-- Validate payloads with Pydantic models at the transform boundary
-- Choose fail-fast over quarantine for malformed records (ya da tersi)
-- Use Parquet for the curated layer
-- Add audit columns for lineage
-
-**Bağımlılık:** 1 (hedef şema) + 4 (raw dosya) gerekli. 6 ve 7'ye girdi verir.
-
----
-
-## Adım 6 — Orkestrasyon
-
-**Amaç:** Parçaları tek komuta bağlamak. `main.py` **ince** olmalı — iş mantığı
-içinde değil, altındaki katmanlarda yaşar.
-
-| # | Alt adım | Ne çözüyor |
-|---|---|---|
-| 6.1 | `main.py`'nin sorumluluğu: sıralama ve hata yönetimi, iş mantığı değil | Şişen giriş dosyası |
-| 6.2 | CLI: `--date`, `--dry-run` (argparse mı, typer mı) | Elle tarih değiştirmek için kod düzenlemek |
-| 6.3 | Adım sırası ve kısmi başarısızlık: raw yazıldı, transform patladı — ne olur | Yarım durum |
-| 6.4 | Backfill: tarih aralığı üzerinde döngü | Geçmiş veriyi doldurmak |
-| 6.5 | Exit code sözleşmesi (0 / 1 / 2) | Cron ve CI'nın hatayı görmesi |
-| 6.6 | Structured logging: `run_id`, JSON formatter, seviye politikası | Bir koşuyu loglardan izleyebilmek |
-| 6.7 | Uçtan uca dar dilim: tek komutla API → Parquet | Adım 0–5'in gerçekten çalıştığının kanıtı |
-| 6.8 | İki kez çalıştır → aynı sonuç doğrulaması | Idempotency'nin sistem seviyesinde sınavı |
-
-**Bitti tanımı (§6'ya ek):**
-
-- [ ] **Tek komut** temiz bir makinede API'den Parquet'e kadar gidiyor
-- [ ] Pipeline patladığında `echo $?` sıfırdan farklı — geçmiş projenin ana hatası buydu
-- [ ] "Başarılı" logu, işin gerçekten yapıldığı **doğrulandıktan sonra** yazılıyor
-- [ ] Tek koşunun tüm log satırları ortak bir `run_id` taşıyor
-- [ ] `--date` ile geçmiş bir gün doldurulabiliyor
-- [ ] `--dry-run` hiçbir dosyaya yazmıyor ama ne yapacağını söylüyor
-
-**ADR adayları:**
-
-- Keep the entrypoint thin: orchestration only
-- Define the CLI contract and exit codes
-- Emit structured JSON logs with a run identifier
-
-**Bağımlılık:** 3, 4, 5 gerekli. 7 ve 9'a girdi verir.
-
----
-
-## Adım 7 — Test
-
-**Amaç:** Değiştirmekten korkmadığın bir kod tabanı. Test, doğruluk kanıtı değil,
-**değişim özgürlüğüdür**.
-
-| # | Alt adım | Ne çözüyor |
-|---|---|---|
-| 7.1 | `pytest` kurulumu, `tests/` neden `src/` dışında | Paketin içine test sızması |
-| 7.2 | 1.4'te kaydedilen gerçek payload → fixture | Uydurma test verisiyle yeşil geçen test |
-| 7.3 | Transform testleri (saf fonksiyon — en kolay, en değerli) | Regresyon |
-| 7.4 | Edge case: eksik alan, boş liste, null, beklenmedik tip | 1.5'te görülen gerçek tuzaklar |
-| 7.5 | HTTP mock'lama (`responses` / `respx`) — retry ve hata yolu testi | Testin ağa çıkması |
-| 7.6 | Idempotency testi (`tmp_path` ile iki kez yaz) | 4.5 ve 5.7'nin otomatik sınavı |
-| 7.7 | Coverage: neyi ölçer, neyi ölçmez, yüzde hedefi tuzağı | Yanlış güven |
-
-**Bitti tanımı (§6'ya ek):**
-
-- [ ] `pytest` **ağ bağlantısı olmadan** tamamen geçiyor
-- [ ] `.env` olmadan da geçiyor
-- [ ] Test verisi gerçek API payload'ından türetildi, elle uydurulmadı
-- [ ] Hata yolları test ediliyor — sadece mutlu yol değil
-- [ ] En az bir test idempotency'yi doğruluyor
-- [ ] Testler birbirinden bağımsız: sıra değişince sonuç değişmiyor
-
-**ADR adayları:**
-
-- Use recorded API payloads as test fixtures
-- Keep tests outside the package directory
-
-**Bağımlılık:** 1 (fixture), 5, 6 gerekli. 8'e girdi verir.
-
----
-
-## Adım 8 — Paketleme + CI
-
-**Amaç:** Kalite kontrolünü insan disiplininden makineye devretmek.
-
-| # | Alt adım | Ne çözüyor |
-|---|---|---|
-| 8.1 | `ruff` (lint + format), `pyproject.toml` konfigürasyonu | Stil tartışması; sessiz buglar |
-| 8.2 | `mypy` — strict mi, kademeli mi | Runtime'da çıkan tip hataları |
-| 8.3 | `Makefile` — komutlar tek yerde | "Hangi komutla çalışıyordu" |
-| 8.4 | `pre-commit` hook'ları | CI'ya kırık kod göndermek |
-| 8.5 | GitHub Actions: adımlar, cache, Python sürüm matrisi | "Bende çalışıyor" |
-| 8.6 | Bağımlılık sabitleme (lock), dev/prod ayrımı | Bir gün kendiliğinden bozulan build |
-| 8.7 | `Dockerfile` (multi-stage, non-root) | Lambda ve taşınabilirlik hazırlığı |
-| 8.8 | README'yi portfolyo kalitesine çıkar: mimari şeması, çalıştırma, badge | Mülakat vitrini |
+- **mypy strict** — kodun büyük kısmı artık config (toml/yml) ve SQL. Tip
+  denetiminden fayda görecek Python yüzeyi çok küçük kaldı.
+- **pre-commit** — CI zaten aynı üç komutu koşuyor. İkinci bir kurulum katmanı,
+  bu boyutta proje için net kazanç değil. (Gerçek ekipte kurulur — notta yazar.)
+- **Docker** — E'de Lambda **zip** paketleme seçiliyor. Docker sadece container
+  image paketlemesi seçilseydi gerekliydi.
 
 **Bitti tanımı (§6'ya ek):**
 
 - [ ] CI yeşil ve **kırık kodda gerçekten kırmızıya dönüyor** (bilerek bozup denendi)
 - [ ] `make lint`, `make test`, `make run` çalışıyor
-- [ ] `pre-commit` kirli commit'i engelliyor (bilerek denendi)
-- [ ] Lock dosyası commit'li — build tekrarlanabilir
-- [ ] Docker image çalışıyor ve root olmayan kullanıcıyla koşuyor
-- [ ] README'deki komutlar kopyala-yapıştır ile çalışıyor (yabancı gözüyle test edildi)
+- [ ] Testler ağ bağlantısı ve gerçek secret olmadan geçiyor
+- [ ] README'deki komutlar kopyala-yapıştır ile çalışıyor
 
-**ADR adayları:**
+**ADR adayları:** Split test responsibility between dbt tests and pytest · Skip mypy and pre-commit, with reasons
 
-- Use ruff for linting and formatting
-- Adopt gradual typing with mypy
-- Pin dependencies with a lock file
-- Containerize with a multi-stage build
-
-**Bağımlılık:** 0 (`pyproject.toml`) + 7 (CI'da koşacak test) gerekli. 9'a girdi verir.
+**Bağımlılık:** C. E'ye girdi verir.
 
 ---
 
-## Adım 9 — AWS'ye taşıma
+## Adım E — AWS
 
-**Amaç:** Aynı kodu buluta taşımak. "Aynı kod" kelimesi kritik — 4.3'teki yol
-soyutlaması burada sınava girer.
+**Amaç:** Aynı pipeline'ı buluta taşımak. "Aynı" kelimesi kritik: A.4'te `layout`
+config'i doğru kurulduysa local → S3 geçişi **kod değişikliği değil, config
+değişikliği** olmalı. Bu adım o iddianın sınavı.
 
 | # | Alt adım | Ne çözüyor |
 |---|---|---|
-| 9.1 | IAM: least privilege, kullanıcı vs rol, local erişim | `AdministratorAccess` alışkanlığı |
-| 9.2 | S3 bucket: isimlendirme, versioning, lifecycle, public access bloğu | Geri dönülemez silme; maliyet |
-| 9.3 | Depolama soyutlaması: local path ↔ `s3://` — kod nasıl değişmiyor | `if is_local:` dallanmalarının çoğalması |
-| 9.4 | Aynı pipeline'ı local'den S3'e yazar hâle getir | İlk bulut dilimi |
-| 9.5 | Lambda paketleme: zip vs container, boyut limiti, cold start, timeout | Deploy edilemeyen fonksiyon |
-| 9.6 | Secret yönetimi: Secrets Manager / SSM Parameter Store | Lambda ortam değişkeninde duran API key |
-| 9.7 | EventBridge cron trigger | Günlük tetikleme |
-| 9.8 | Glue Crawler → Data Catalog | Şema keşfi |
-| 9.9 | Athena sorgusu, partition projection, taranan veri maliyeti | Tek sorguda yüksek fatura |
-| 9.10 | CloudWatch: log, metrik, alarm | Sessizce çalışmayan pipeline |
-| 9.11 | Maliyet: budget alarm, dosya boyutu, partition sayısı | Sürpriz fatura |
+| E.1 | IAM: least privilege, kullanıcı vs rol | `AdministratorAccess` alışkanlığı |
+| E.2 | S3 bucket: isimlendirme, versioning, public access bloğu, lifecycle | Geri dönülemez silme; maliyet |
+| E.3 | dlt destination'ı `s3://`'ye çevir — **kod değişmeden** | 9.3'ün sınavı. Değişiyorsa A.4 yanlış kurulmuş |
+| E.4 | Athena: external table + **partition projection** (Glue Crawler yok) | Şema keşfi. Crawler = fazladan servis, maliyet ve gecikme |
+| E.5 | Athena sorgusu, taranan byte ölçümü, partition kullanıldığının kanıtı | Tek sorguda yüksek fatura |
+| E.6 | Lambda paketleme (zip), boyut limiti, timeout, cold start | Deploy edilemeyen fonksiyon |
+| E.7 | Secret: SSM Parameter Store / Secrets Manager | Lambda env değişkeninde duran API key |
+| E.8 | EventBridge cron trigger | Günlük tetikleme |
+| E.9 | CloudWatch: log grubu + **bir** alarm (pipeline sessizce çalışmıyor mu) | Sessiz başarısızlık |
+| E.10 | Budget alarm + aylık tahmini maliyet | Sürpriz fatura |
+
+> **Açık risk:** dbt'nin Lambda içinde koşması boyut ve süre olarak sıkışık.
+> E.6'da iki seçenek tartışılacak: (a) dbt'yi Lambda'ya sokmak, (b) Lambda sadece
+> extract+raw, transform ayrı tetiklenir. Karar ADR olur. **Bu tercih şimdiden
+> yapılmıyor** — E.3–E.5 ölçülmeden karar tahmine dayanır.
 
 **Bitti tanımı (§6'ya ek):**
 
-- [ ] Pipeline **elle hiçbir müdahale olmadan** günlük çalışıyor
-- [ ] Local ve S3 modu **aynı kod yolunu** kullanıyor — kopyala-yapıştır ikinci sürüm yok
-- [ ] Athena'da anlamlı bir SQL sorgusu sonuç döndürüyor
-- [ ] Sorgu partition kullanıyor — tüm bucket'ı taramıyor (taranan byte ölçüldü)
-- [ ] Pipeline sessizce başarısız olursa **haber veren** bir alarm var
-- [ ] IAM politikası wildcard değil, gerekli izinlerle sınırlı
-- [ ] Budget alarm kurulu ve aylık tahmini maliyet biliniyor
+- [ ] Pipeline elle müdahale olmadan günlük çalışıyor
+- [ ] Local ve S3 modu **aynı kod yolunu** kullanıyor — ikinci sürüm yok
+- [ ] Athena'da anlamlı bir SQL sorgusu sonuç döndürüyor ve **partition kullanıyor** (taranan byte ölçüldü)
+- [ ] Sessiz başarısızlıkta haber veren bir alarm var
+- [ ] IAM politikası wildcard değil
+- [ ] Budget alarm kurulu, aylık tahmini maliyet biliniyor
 
-**ADR adayları:**
+**ADR adayları:** Use partition projection instead of a Glue Crawler · Store secrets in SSM · Choose where dbt runs in the cloud
 
-- Abstract the storage backend behind a single interface
-- Choose Lambda packaging: zip vs container image
-- Store secrets in SSM Parameter Store instead of environment variables
-- Use partition projection instead of a Glue Crawler (ya da tersi)
-
-**Bağımlılık:** 6 (çalışan pipeline) + 8 (paketleme, CI) gerekli. Son adım.
+**Bağımlılık:** C, D. Son adım.
 
 ---
 
 ## Bu haritanın bilinen zayıf noktaları
 
-Dürüst olmak gerekirse:
-
-- **Adım 4 ve 5 tahmin üzerine kurulu.** Gerçek payload görülmeden yazıldı, revize
-  edilecek. Yukarıdaki uyarılar bu yüzden var.
-- **Adım 9 en riskli.** 11 alt adım, gerçek para harcanan tek adım, ve geri alması
-  en zor olanı. Muhtemelen bölünmesi gerekecek.
-- **Test adımı geç geliyor.** İdeal olan her adımda test yazmaktır. Buradaki sıra
-  öğrenme kolaylığı için seçildi, profesyonel pratik değil — Adım 5 ve 6'da yazılan
-  kodun testi 7'ye ertelenmemeli, oraya sadece **eksik kalanlar** kalmalı.
+- **A ve B'de iki yeni araç aynı anda öğreniliyor.** Bir şey kırıldığında hangi
+  aracın suçu olduğunu ayırt etmek zor olabilir. Panzehir: A tamamen bitmeden
+  B'ye geçilmiyor.
+- **E hâlâ en riskli adım.** 10 alt adım, gerçek para harcanan tek yer, geri alması
+  en zor olanı. Bölünmesi gerekebilir.
+- **Elle HTTP client yazma öğrenmesi bilinçli olarak feda edildi.** Karşılığında
+  Adım 1'in ölçümleri ve A.3/A.6'daki "dlt bunu nasıl yapıyor" incelemesi var.
+  Bu bir takas, bedava değil.
