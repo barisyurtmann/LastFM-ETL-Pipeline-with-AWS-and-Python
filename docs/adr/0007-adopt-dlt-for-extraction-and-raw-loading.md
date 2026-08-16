@@ -1,7 +1,11 @@
 # ADR-0007: Adopt dlt for extraction and raw loading
 
-**Status:** Accepted
+**Status:** Superseded by [ADR-0009](0009-return-to-a-hand-written-python-pipeline.md)
 **Date:** 2026-08-15
+
+> Superseded on 2026-08-15, before any implementation. The body below is left unedited.
+> ADR-0009 does not dispute this ADR's technical argument; it concludes that the argument
+> does not apply to a project whose scope is a fixed reference architecture.
 
 ## Context
 

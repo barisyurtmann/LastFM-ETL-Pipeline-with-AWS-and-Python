@@ -1,294 +1,223 @@
 # Yol Haritası
 
-Bu dosya **planı** tutar: hangi adım, hangi alt adımlar, ne zaman bitmiş sayılır,
-neye bağımlı.
+Bu dosya **planı** tutar: hangi adım, hangi alt adımlar, ne zaman bitmiş sayılır.
 
 > **Burada durum bilgisi yoktur.** Nerede kaldığımız için → [`PROGRESS.md`](PROGRESS.md)
 > Sabit sözleşme (hedef, tercihler, mimari) için → [`PROJECT_CONTEXT.md`](PROJECT_CONTEXT.md)
 
-Üç dosyanın iş bölümü:
+---
 
-| Dosya | Soru | Değişme sıklığı |
+## Bu planın kaynağı
+
+Plan, DataVidhya "Spotify Pipeline" dersinin **dört parçasından** türetildi. Kapsam
+o dört parçadır — ne eksik, ne fazla.
+
+| Ders | Konu | Bu roadmap'te |
 |---|---|---|
-| `PROJECT_CONTEXT.md` | Ne inşa ediyoruz, neden? | Nadiren |
-| `ROADMAP.md` | Hangi sırayla, ne zaman bitmiş sayılır? | Adım revize edildikçe |
-| `PROGRESS.md` | Şu an neredeyim? | Her alt adımda |
+| P1 | Mimari, API kimlik bilgileri, AWS servisleri, S3 bucket'ları | **Adım P1** |
+| P2 | Local Python: extract + nested JSON'u tablolara düzleştir | **Adım P2** |
+| P3 | İki Lambda, layer, env var, CloudWatch + S3 tetikleyicileri, IAM | **Adım P3** |
+| P4 | Glue Crawler, Data Catalog, Athena SQL | **Adım P4** |
+
+**Kurstan tek farkı:** kurs kodu konsola yapıştırıyor, biz repoya yazıyoruz. Öğrenilecek
+şey mimari değil, mimarinin etrafındaki mühendislik.
 
 ---
 
-## REVİZYON — 2026-08-15: araç-merkezli tek tur
+## Öğrenilecek "structure" — bu tablo planın özüdür
 
-Bu dosyanın önceki hâli **9 adımdı ve her katmanı elle yazmayı** öngörüyordu:
-kendi retry döngüsü, kendi sayfalama mantığı, kendi atomic write'ı, Pydantic ile
-kendi transform'u.
+Her satır bir alt adımın varlık sebebi. Kurs sol sütunu yapıyor; biz sağ sütunu.
 
-**Neden değişti.** Adım 1'de veri davranışı elle ölçüldü (hata kodları, rate limit,
-`limit` parametresinin kırpması, şema derinliği). O bilgi bankaya yazıldı — ADR-0004,
-0005, 0006 ve notlar 11, 13, 14, 15, 17'de duruyor. Aynı davranışların *kodunu* elle
-yazmak yeni bilgi üretmiyor, sadece süre harcıyor. Sektörde bu katman zaten elle
-yazılmıyor: extract + raw load için **dlt**, transform için **dbt** kullanılıyor.
-
-**Ne değişmedi.** Kararların gerekçesi. Her araç, çözdüğü problem üzerinden
-anlatılacak — "dlt kurduk, çalıştı" değil, "1.8'de ölçtüğüm rate limit davranışını
-dlt şu şekilde ele alıyor, benim yazacağımdan şu yönden farklı".
-
-**Mimari sonucu:** proje **ETL'den ELT'ye** döndü. Transform artık ayrı bir Python
-katmanında değil, sorgu motorunun (DuckDB → Athena) içinde SQL olarak yaşıyor.
-Gerekçe: ADR-0008.
-
-### Numaralandırma
-
-Eski adım numaraları (0–9) ve alt adımları **yeniden kullanılmadı**. Notlar ve
-PROGRESS bu numaralara referans veriyor; aynı numarayı yeni bir içeriğe vermek o
-referansları sessizce yalancı yapardı. Yeni adımlar bu yüzden **harf** aldı: A–E.
-Eski numaraların nereye gittiği aşağıdaki eşleme tablosunda.
-
-Bu, ADR'lerin asla yeniden numaralanmaması kuralının aynısı: **numara bir kimliktir,
-bir sıra değildir.**
+| # | Kurs ne yapıyor | Profesyonel karşılığı | Nerede |
+|---|---|---|---|
+| 1 | `client_id = "your_client_id"` kodda | `.env` + fail-fast doğrulama, sır repoda değil | P1.1 |
+| 2 | Root hesapla konsola giriliyor | IAM kullanıcı, least privilege, budget alarm | P1.2 |
+| 3 | Bucket adı `spotify-etl-raw-darshil` | İsimlendirme kuralı, public access blok, versioning | P1.3 |
+| 4 | Tek dosyada 200 satır | `src/lastfm_etl/` modülleri, sorumluluk sınırı | P2.1, P2.3 |
+| 5 | Hata yolu yok, sadece mutlu yol | timeout, `error` koduna göre retry, gürültülü patlama | P2.1 |
+| 6 | Test yok | `pytest` + elde duran fixture'lar (ADR-0004) | P2.4 |
+| 7 | Kod konsol editörüne yapıştırılıyor | zip paketleme — versiyonlanabilir, `git`'te duran deploy | P3.1 |
+| 8 | `AmazonS3FullAccess` | Least-privilege policy, iki role ayrı | P3.4 |
+| 9 | README yok | Mimari şeması + çalıştırma + maliyet tablosu | P4.3 |
 
 ---
 
 ## Kurallar
 
-- **Tek seferde tek alt adım.** A.3 bitmeden A.4'e geçilmez.
-- Her adımın "bitti" tanımı, `PROJECT_CONTEXT.md` §6'daki **genel kontrol listesine ek**
-  şartlardır.
-- **ADR numaraları burada verilmez.** Burada sadece ADR **adayı** konular listelenir.
-- Alt adım listesi kutsal değil. Gerçekle çelişirse liste değişir, gerçek değil.
-- **Her adımda not yazılır.** Araç kullanmak, notu atlamanın gerekçesi değil — tersine,
-  "bu araç benim yazacağım şeyi nasıl çözüyor" notu daha değerlidir.
+- **Tek seferde tek alt adım.** P2.1 bitmeden P2.2'ye geçilmez.
+- **Not koddan sonra yazılır ve hiçbir adımı bloklamaz.** Uzunluk sınırı yok, sıra sınırı var.
+- **ADR sadece geri alması pahalı kararlar için.**
+- **14 alt adım bir bütçedir.** Yeni alt adım ancak bir eskisi silinerek eklenir.
+- Bir alt adım "kursta yok" ve "structure de değil" ise → `Sonraki tur` bölümüne.
 
 ---
 
-## Bağımlılık haritası
+## Akış
 
-```mermaid
-graph LR
-    S1[1 Veriyi tanı ✔] --> A[A dlt: extract + raw]
-    A --> B[B dbt: transform + model]
-    B --> C[C Orkestrasyon]
-    C --> D[D Test + CI]
-    C --> E[E AWS]
-    D --> E
+```
+Last.fm API
+    │
+    ▼
+EventBridge (günlük)  ──►  Lambda: extract  ──►  S3 raw bucket
+                                                  raw/to_processed/*.json
+                                                       │
+                                                  (PUT event)
+                                                       ▼
+                                              Lambda: transform
+                                                       │
+                                    ┌──────────────────┴─────────────┐
+                                    ▼                                ▼
+                        S3 transformed bucket              raw/processed/ (arşiv)
+                        tracks/  artists/  (parquet)
+                                    │
+                                    ▼
+                            Glue Crawler
+                                    │
+                                    ▼
+                          Glue Data Catalog
+                                    │
+                                    ▼
+                              Athena (SQL)
 ```
 
-Kritik yol: **A → B → C → E**. D kritik yolun dışında ama E'den önce bitmelidir —
-test edilmemiş kodu buluta taşımak, hatayı en pahalı yerde bulmaktır.
+**Bağımlılık düz bir çizgi:** P1 → P2 → P3 → P4. Paralel iş yok.
 
 ---
 
-## Eski numara eşlemesi
+## Adım P1 — Kurulum ve hesaplar
 
-| Eski | Neydi | Yeni durum |
-|---|---|---|
-| 0.1–0.6 | Repo kurulumu | **Tamamlandı.** Değişmedi. |
-| 1.1–1.8 | Veriyi tanı | **Tamamlandı** (1.8 kapanışı hariç). Çıktısı bu revizyonun girdisi. |
-| 2.1–2.6 | pydantic-settings ile config | → **A.2.** `dlt.secrets` ile. Fail-fast ve secret sızıntısı konuları aynen duruyor, aracı değişti. |
-| 3.1–3.8 | Elle HTTP client, retry, backoff | → **A.3.** dlt `rest_api` source. Elle yazılmıyor, davranışı ölçülüp notlanıyor. |
-| 3.9 | Sayfalama | → **A.3.** dlt paginator. ADR-0006'nın top-100 kararı geçerli, uygulaması dlt'nin. |
-| 4.1–4.7 | Raw katman, path builder, atomic write | → **A.4.** dlt `filesystem` destination. Partition layout config'ten. |
-| 5.1–5.8 | Pydantic + pandas transform | → **B.** dbt modelleri (SQL). |
-| 6.1–6.8 | main.py, CLI, backfill, run_id | → **C.** Küçültüldü: CLI ve backfill iptal (gerekçe C'de). |
-| 7.1–7.7 | pytest | → **D.1–D.3.** Küçültüldü: transform testleri dbt testlerine devredildi. |
-| 8.1–8.8 | ruff, mypy, Makefile, pre-commit, CI, Docker | → **D.4–D.6.** mypy strict ve Docker **iptal** (gerekçe D'de). |
-| 9.1–9.11 | AWS | → **E.** Glue Crawler **iptal**, partition projection ile değiştirildi. |
+> Ders P1'in karşılığı. Kod yazılmıyor; hesap, sır ve depolama hazırlanıyor.
 
----
+| # | Alt adım | Kursta | Structure dersi |
+|---|---|---|---|
+| P1.1 | `.env`'den config okuma, eksik/boş key'de **fail-fast**, sırrın loga ve `repr()`'e sızmaması | Kimlik bilgileri kodda yazılı | Sır nerede durur, kim okur, nasıl doğrulanır |
+| P1.2 | AWS hesabı: **IAM kullanıcı** (root değil), `aws configure`, **budget alarm** | Anlatılmıyor | Least privilege; korkuluk harcamadan **önce** kurulur |
+| P1.3 | İki S3 bucket (`raw`, `transformed`): isimlendirme, public access blok, versioning, klasör şeması | Konsoldan iki bucket | Geri dönülemez silme, isim çakışması, erişim varsayılanı |
 
-## Adım A — Extract + raw load (dlt)
+**Bitti tanımı:**
 
-**Amaç:** Last.fm'den veriyi çekip raw katmana yazmak — ve bunu yaparken, elle
-yazsaydım hangi problemleri çözmem gerekeceğini **aracın çözümü üzerinden** görmek.
+- [ ] `python -c "from lastfm_etl.config import load; print(load())"` çalışıyor ve sırrı **basmıyor**
+- [ ] `.env` boşken aynı komut **gürültülü** patlıyor, `echo $?` sıfır değil
+- [ ] `aws s3 ls` root ile değil, IAM kullanıcısıyla çalışıyor
+- [ ] Budget alarm kurulu (eşik: aylık $5)
+- [ ] İki bucket var, ikisi de public erişime kapalı
+- [ ] `.env` `git status`'ta görünmüyor
 
-| # | Alt adım | Ne çözüyor / ne öğretiyor |
-|---|---|---|
-| A.1 | dlt'nin modeli: `source` / `resource` / `destination` / `pipeline` / `state` nedir | Aracın zihin haritası. Hangi kavram benim hangi elle-yazacağım parçama denk geliyor |
-| A.2 | Secret yönetimi: `.dlt/secrets.toml` vs env vs mevcut `.env` — hangisi, neden; git'e sızmaması | Eski 2.x'in özü. `.gitignore` sınavı ikinci kez |
-| A.3 | `rest_api` source: endpoint, `format=json`, paginator, ADR-0006'nın top-100 limiti | Eski 3.x. Retry/backoff/pagination dlt'de nasıl yapılandırılıyor, varsayılanları ne |
-| A.4 | `filesystem` destination: parquet mi jsonl mi, `layout` ile partition (`dt=`), local `data/` → `s3://` aynı config | Eski 4.x. Raw immutability ve partition şeması korunuyor mu |
-| A.5 | Yazma davranışı: `write_disposition` (`replace` / `append` / `merge`) — hangisi bizim grain'imize uyuyor | **İdempotency.** Eski 4.5'in aynısı, kararı dlt'ye devretmiyoruz |
-| A.6 | Hata yolu ölçümü: bozuk `api_key` ile pipeline çalıştır — dlt ne yapıyor, kaç kez deniyor, exit code ne | 1.3'te ölçtüğüm `403 + error:10` davranışının araç tarafındaki karşılığı |
-| A.7 | dlt'nin ürettiği `_dlt_*` metadata tabloları / kolonları: load_id, schema, state | Lineage ve incremental'ın altyapısı. Eski 4.6'nın hazır hâli |
-| A.8 | Uçtan uca: tek komut → `data/raw/` altında parquet dosyası. İki kez çalıştır, sonucu karşılaştır | Dar dilimin ilk yarısı + idempotency sınavı |
-
-**Bitti tanımı (§6'ya ek):**
-
-- [ ] `data/raw/` altında beklenen partition yolunda gerçek veri var
-- [ ] Peş peşe iki çalıştırma sonrası satır sayısı **bilinçli olarak** ya aynı ya artmış — hangisi olduğu ve neden olduğu yazılı
-- [ ] Bozuk `api_key` ile pipeline **gürültülü** başarısız oluyor, `echo $?` sıfır değil
-- [ ] Hiçbir log satırında ve hiçbir commit'te API key yok
-- [ ] Raw dosya yolu `s3://` yapısını birebir taklit ediyor
-- [ ] dlt'nin retry/pagination varsayılanları **okundu ve notlandı** — "çalışıyor" yeterli değil
-
-**ADR adayları:**
-
-- Adopt dlt for extraction and raw loading
-- Choose the raw file format and partition layout for the filesystem destination
-- Choose a write disposition for the raw layer
-
-**Not adayları:** dlt'nin çalışma modeli · dlt state ve incremental loading · elle
-yazılan retry vs dlt'nin retry'ı (1.8 ölçümüyle karşılaştırma)
-
-**Bağımlılık:** 1 (grain, şema, rate limit ölçümü). B'ye girdi verir.
+**Not adayı:** AWS kimlik zinciri — `~/.aws/credentials` neden proje `.env`'inde değil
 
 ---
 
-## Adım B — Transform + veri modeli (dbt-duckdb)
+## Adım P2 — Local: extract + transform
 
-**Amaç:** Asıl hedef bu adım. Raw parquet'ten sorgulanabilir, test edilmiş, katmanlı
-bir veri modeli. Buradan sonrası (dbt + Snowflake) aynı kaslar.
+> Ders P2'nin karşılığı. Bütün iş mantığı burada yazılıyor ve **çalıştığı görülüyor.**
+> P3 bu kodu taşır, yeniden yazmaz.
 
-| # | Alt adım | Ne çözüyor / ne öğretiyor |
-|---|---|---|
-| B.1 | dbt projesi kurulumu: `profiles.yml`, `dbt_project.yml`, klasör yapısı — ve bunların repoda nereye gireceği | Proje düzeni. `src/` ile dbt yan yana nasıl durur |
-| B.2 | DuckDB'nin rolü: veriyi *tutmuyor*, parquet'i yerinde okuyor (`read_parquet`) | Lakehouse mantığının en küçük hâli. Neden ayrı bir ambar kurmuyoruz |
-| B.3 | `sources.yml`: raw parquet'i dbt'ye kaynak olarak tanıtmak, `freshness` | Data contract'ın ilk somut hâli |
-| B.4 | **staging** katmanı: `stg_top_tracks` — düzleştirme, tip çevrimi, isimlendirme kuralı | Eski 5.4. Medallion'ın bronze→silver'ı |
-| B.5 | **mart** katmanı: grain'i (ADR-0005) uygulayan fact tablosu + gerekiyorsa dimension | **Data modeling'in kendisi.** Fact/dimension, surrogate key, grain koruma |
-| B.6 | Materialization seçimi: `view` / `table` / `incremental` / `external` — hangisi nerede, maliyet farkı | Eski 5.6 + 5.7. `incremental` = idempotency'nin dbt'deki karşılığı |
-| B.7 | dbt testleri: `not_null`, `unique`, `accepted_values`, `relationships` + bir singular test | Eski 5.8 ve 7.3'ün yerini alıyor. Veri kalitesi kodun değil, modelin sorumluluğu |
-| B.8 | Dokümantasyon: model/kolon açıklamaları, `dbt docs generate`, lineage grafiği | Mülakat vitrini. Lineage'ı elle çizmiyoruz |
-| B.9 | İki kez `dbt build` → satır sayısı değişmiyor | Idempotency'nin model katmanındaki sınavı |
+| # | Alt adım | Kursta | Structure dersi |
+|---|---|---|---|
+| P2.1 | Extract modülü: `requests`, `format=json`, `timeout`, **gövdeyi status'tan önce oku**, `error` koduna göre retry, top-100 sayfalama (ADR-0006) | `spotipy` her şeyi gizliyor; hata yolu yok | Modül sınırı; hata yönetimi baştan, süs olarak değil |
+| P2.2 | Raw'ı S3'e yaz: `boto3.put_object`, key şeması `raw/to_processed/lastfm_raw_<ts>.json` | Aynı | Raw immutability; ham veri **hiç dokunulmadan** saklanır |
+| P2.3 | Transform modülü: nested JSON → `tracks` + `artists`, `drop_duplicates`, tip dönüşümü, **Parquet** | 3 tablo, CSV | Düzleştirme, foreign key, açık tip |
+| P2.4 | Local uçtan uca çalıştır + `pytest` (fixture'larla, ağsız) | Test yok | Testin ne olduğu; fixture'ın neden kaydedildiği |
 
-**Bitti tanımı (§6'ya ek):**
+**Bitti tanımı:**
 
-- [ ] `dbt build` temiz geçiyor ve **en az bir test kasten bozulup kırmızıya döndüğü görüldü**
-- [ ] Grain korunuyor: mart tablosunda birincil anahtar üzerinde `unique` testi geçiyor
-- [ ] Hiçbir sayısal alan string kalmadı — tipler bilinçli
-- [ ] Aynı günün `dbt build`'i iki kez koşunca satır sayısı artmıyor
-- [ ] Her modelin ve en az kritik kolonların `description`'ı var
-- [ ] staging ↔ mart sorumluluk sınırı yazılı: neye staging'de, neye mart'ta dokunulur
+- [ ] `raw` bucket'ta gerçek JSON var — S3'te, local `data/` klasöründe değil
+- [ ] `transformed` bucket'ta `tracks/` ve `artists/` altında Parquet var
+- [ ] Bozuk `api_key` ile **gürültülü** patlıyor
+- [ ] `tracks` tablosunda `(snapshot_date, rank)` tekrar etmiyor
+- [ ] Hiçbir sayısal alan string kalmadı (`playcount`, `duration`, `listeners`)
+- [ ] Bozuk/eksik alanlı bir kayıt geldiğinde davranış **yazılı**: at, null'la, yoksa patlat
+- [ ] `pytest` ağ ve gerçek sır olmadan geçiyor
+- [ ] **Aynı gün iki kez çalıştırıldığında ne olduğu yazılı ve kasıtlı**
 
-**ADR adayları:**
+**ADR adayı:** Define the curated schema and its explicit types
 
-- Transform with dbt on DuckDB instead of Python (ETL → ELT)
-- Define the staging / mart layer boundary
-- Choose materializations per layer
-
-**Not adayları:** dbt'nin çalışma modeli (compile → run, ref, DAG) · staging/mart
-katmanlama · fact ve dimension tabloları · materialization türleri ve maliyeti ·
-dbt testleri vs pytest — hangisi neyi test eder
-
-**Bağımlılık:** A. C'ye girdi verir.
+**Not adayı:** Nested JSON düzleştirme kalıpları · Parquet vs CSV · pytest ve fixture
 
 ---
 
-## Adım C — Orkestrasyon
+## Adım P3 — AWS'ye taşı
 
-**Amaç:** İki aracı tek komuta bağlamak. Bu adım **ince** — iş mantığı A ve B'de.
+> Ders P3'ün karşılığı. **İş mantığı yazılmaz** — P2'nin fonksiyonları paketlenir ve
+> tetikleyicilere bağlanır. İş mantığı değişiyorsa P2 yanlış yazılmıştır.
 
-| # | Alt adım | Ne çözüyor |
-|---|---|---|
-| C.1 | Runner'ın sorumluluğu: sırayla dlt pipeline + `dbt build`, hata yönetimi, başka bir şey değil | Şişen giriş dosyası |
-| C.2 | Kısmi başarısızlık: raw yazıldı, dbt patladı — sistem hangi durumda kalıyor | Yarım durum. A.5 ve B.6'nın sistem seviyesindeki sınavı |
-| C.3 | Exit code sözleşmesi (0 / 1) | Cron, CI ve EventBridge'in hatayı görmesi. **Geçmiş projenin öldüğü nokta** |
-| C.4 | Logging: `run_id`, seviye politikası, dlt ve dbt loglarının nereye gittiği | Bir koşuyu loglardan izleyebilmek |
-| C.5 | Uçtan uca: tek komut → API'den mart tablosuna. İki kez çalıştır, aynı sonuç | **Projenin kanıtı** |
+| # | Alt adım | Kursta | Structure dersi |
+|---|---|---|---|
+| P3.1 | Extract Lambda: **zip paketleme**, bağımlılık layer'ı, env var, `timeout` 1 dk, `memory` 256 MB | Kod konsol editöründe | Deploy edilebilir artefakt; `git`'te duran kod |
+| P3.2 | Transform Lambda: `get_object` → dönüştür → `put_object` → dosyayı `to_processed/` → `processed/` taşı | Aynı | Yeniden işlemeyi önleyen dosya taşıma = **idempotency mekanizması** |
+| P3.3 | Tetikleyiciler: EventBridge günlük cron + S3 `PUT` (prefix `raw/to_processed/`, suffix `.json`) | Aynı | Zaman-tabanlı vs olay-tabanlı tetik; filtre neden zorunlu |
+| P3.4 | IAM: iki Lambda için **ayrı least-privilege rol** | `AmazonS3FullAccess` | Kullanıcı → rol geçişi; rolün neden kullanıcıdan farklı olduğu |
 
-**İptal edilenler ve gerekçesi:**
+**Bitti tanımı:**
 
-- **CLI (`--date`, `--dry-run`)** — `chart.getTopTracks` tarih parametresi almıyor
-  (1.8'de ölçülüyor), yani `--date` ile API'den geçmiş çekilemez. Argparse/typer
-  öğrenmek bu projenin konusu değil.
-- **Backfill döngüsü** — aynı sebep. Geçmiş sadece ileriye doğru birikir. Raw'ı
-  yeniden işlemek zaten `dbt build`.
+- [ ] Lambda, P2'nin **aynı fonksiyonunu** çağırıyor — ikinci bir kopya yok
+- [ ] Extract Lambda elle tetiklendi, `raw` bucket'ta dosya oluştu
+- [ ] O dosya transform Lambda'yı **kendiliğinden** tetikledi
+- [ ] Dosya `processed/` altına taşındı, `to_processed/` boş
+- [ ] Rol politikalarında `*` yok, iki rol ayrı
+- [ ] Lambda patladığında CloudWatch Logs'ta teşhise yeten satır var
+- [ ] `echo $?` / Lambda `statusCode` hatada başarılı görünmüyor
 
-**Bitti tanımı (§6'ya ek):**
+**ADR adayı:** Package Lambdas as zip rather than container images
 
-- [ ] **Tek komut** temiz bir makinede API'den mart tablosuna kadar gidiyor
-- [ ] Pipeline patladığında `echo $?` sıfırdan farklı — bilerek bozulup denendi
-- [ ] "Başarılı" logu, iş gerçekten yapıldıktan **sonra** yazılıyor
-- [ ] Tek koşunun log satırları ortak bir `run_id` taşıyor
-
-**ADR adayları:** Keep the entrypoint thin: orchestration only · Define the exit code contract
-
-**Bağımlılık:** A, B. D ve E'ye girdi verir.
+**Not adayı:** Lambda çalışma modeli (cold start, layer, timeout) · S3 event semantiği
 
 ---
 
-## Adım D — Test + CI
+## Adım P4 — Catalog + sorgu
 
-**Amaç:** Kalite kontrolünü insan disiplininden makineye devretmek — ama sadece
-gerçekten değer üreten kısmını.
+> Ders P4'ün karşılığı. Pipeline burada **kanıtlanır.**
 
-| # | Alt adım | Ne çözüyor |
-|---|---|---|
-| D.1 | Test sorumluluk bölüşümü: neyi dbt test eder, neyi pytest | Aynı şeyi iki yerde test etme israfı |
-| D.2 | pytest: 1.4'teki fixture'larla dlt source'un şema/parse davranışı | Elimde duran fixture'lar boşa gitmesin |
-| D.3 | Hata yolu testi: bozuk payload / bozuk key | Sadece mutlu yolu test etme tuzağı |
-| D.4 | `ruff` (lint + format), `pyproject.toml` konfigürasyonu | Stil tartışması; sessiz buglar |
-| D.5 | `Makefile` — `make run`, `make test`, `make lint` | "Hangi komutla çalışıyordu" |
-| D.6 | GitHub Actions: `uv sync` → ruff → pytest → `dbt build` (fixture verisiyle) | "Bende çalışıyor" |
-| D.7 | README'yi portfolyo kalitesine çıkar: mimari şeması, çalıştırma, dlt/dbt gerekçesi | Mülakat vitrini |
+| # | Alt adım | Kursta | Structure dersi |
+|---|---|---|---|
+| P4.1 | Glue Crawler: `transformed` bucket'ı tara, `lastfm_db` oluştur, iki tablo, tipleri **doğrula** | Aynı | Şema çıkarımı; Crawler'ın ne zaman gereksiz olduğu |
+| P4.2 | Athena: sonuç konumu ayarı, ilk `SELECT`, `tracks ⋈ artists` JOIN | Aynı | Metastore + sorgu motoru ayrımı; `$5/TB` maliyet modeli |
+| P4.3 | README: mimari şeması, çalıştırma adımları, **maliyet tablosu** | README yok | Portfolyo vitrini; bir yabancının projeyi çalıştırabilmesi |
 
-**İptal edilenler ve gerekçesi:**
+**Bitti tanımı:**
 
-- **mypy strict** — kodun büyük kısmı artık config (toml/yml) ve SQL. Tip
-  denetiminden fayda görecek Python yüzeyi çok küçük kaldı.
-- **pre-commit** — CI zaten aynı üç komutu koşuyor. İkinci bir kurulum katmanı,
-  bu boyutta proje için net kazanç değil. (Gerçek ekipte kurulur — notta yazar.)
-- **Docker** — E'de Lambda **zip** paketleme seçiliyor. Docker sadece container
-  image paketlemesi seçilseydi gerekliydi.
-
-**Bitti tanımı (§6'ya ek):**
-
-- [ ] CI yeşil ve **kırık kodda gerçekten kırmızıya dönüyor** (bilerek bozup denendi)
-- [ ] `make lint`, `make test`, `make run` çalışıyor
-- [ ] Testler ağ bağlantısı ve gerçek secret olmadan geçiyor
+- [ ] Glue'da iki tablo var, kolon tipleri doğru (`col0`, `col1` yok)
+- [ ] Athena'da JOIN'li bir sorgu doğru sonuç döndürüyor
+- [ ] Bir sorgunun **taranan byte'ı** okundu, maliyeti hesaplandı
+- [ ] Crawler'ın koşu maliyeti biliniyor (~$0.44/koşu)
 - [ ] README'deki komutlar kopyala-yapıştır ile çalışıyor
+- [ ] **Pipeline elle müdahale olmadan bir gün çalıştı ve veri geldi**
 
-**ADR adayları:** Split test responsibility between dbt tests and pytest · Skip mypy and pre-commit, with reasons
-
-**Bağımlılık:** C. E'ye girdi verir.
-
----
-
-## Adım E — AWS
-
-**Amaç:** Aynı pipeline'ı buluta taşımak. "Aynı" kelimesi kritik: A.4'te `layout`
-config'i doğru kurulduysa local → S3 geçişi **kod değişikliği değil, config
-değişikliği** olmalı. Bu adım o iddianın sınavı.
-
-| # | Alt adım | Ne çözüyor |
-|---|---|---|
-| E.1 | IAM: least privilege, kullanıcı vs rol | `AdministratorAccess` alışkanlığı |
-| E.2 | S3 bucket: isimlendirme, versioning, public access bloğu, lifecycle | Geri dönülemez silme; maliyet |
-| E.3 | dlt destination'ı `s3://`'ye çevir — **kod değişmeden** | 9.3'ün sınavı. Değişiyorsa A.4 yanlış kurulmuş |
-| E.4 | Athena: external table + **partition projection** (Glue Crawler yok) | Şema keşfi. Crawler = fazladan servis, maliyet ve gecikme |
-| E.5 | Athena sorgusu, taranan byte ölçümü, partition kullanıldığının kanıtı | Tek sorguda yüksek fatura |
-| E.6 | Lambda paketleme (zip), boyut limiti, timeout, cold start | Deploy edilemeyen fonksiyon |
-| E.7 | Secret: SSM Parameter Store / Secrets Manager | Lambda env değişkeninde duran API key |
-| E.8 | EventBridge cron trigger | Günlük tetikleme |
-| E.9 | CloudWatch: log grubu + **bir** alarm (pipeline sessizce çalışmıyor mu) | Sessiz başarısızlık |
-| E.10 | Budget alarm + aylık tahmini maliyet | Sürpriz fatura |
-
-> **Açık risk:** dbt'nin Lambda içinde koşması boyut ve süre olarak sıkışık.
-> E.6'da iki seçenek tartışılacak: (a) dbt'yi Lambda'ya sokmak, (b) Lambda sadece
-> extract+raw, transform ayrı tetiklenir. Karar ADR olur. **Bu tercih şimdiden
-> yapılmıyor** — E.3–E.5 ölçülmeden karar tahmine dayanır.
-
-**Bitti tanımı (§6'ya ek):**
-
-- [ ] Pipeline elle müdahale olmadan günlük çalışıyor
-- [ ] Local ve S3 modu **aynı kod yolunu** kullanıyor — ikinci sürüm yok
-- [ ] Athena'da anlamlı bir SQL sorgusu sonuç döndürüyor ve **partition kullanıyor** (taranan byte ölçüldü)
-- [ ] Sessiz başarısızlıkta haber veren bir alarm var
-- [ ] IAM politikası wildcard değil
-- [ ] Budget alarm kurulu, aylık tahmini maliyet biliniyor
-
-**ADR adayları:** Use partition projection instead of a Glue Crawler · Store secrets in SSM · Choose where dbt runs in the cloud
-
-**Bağımlılık:** C, D. Son adım.
+**Not adayı:** Data Catalog / metastore nedir · Athena maliyet modeli ve partition
 
 ---
 
-## Bu haritanın bilinen zayıf noktaları
+## Sonraki tur (bu projede değil)
 
-- **A ve B'de iki yeni araç aynı anda öğreniliyor.** Bir şey kırıldığında hangi
-  aracın suçu olduğunu ayırt etmek zor olabilir. Panzehir: A tamamen bitmeden
-  B'ye geçilmiyor.
-- **E hâlâ en riskli adım.** 10 alt adım, gerçek para harcanan tek yer, geri alması
-  en zor olanı. Bölünmesi gerekebilir.
-- **Elle HTTP client yazma öğrenmesi bilinçli olarak feda edildi.** Karşılığında
-  Adım 1'in ölçümleri ve A.3/A.6'daki "dlt bunu nasıl yapıyor" incelemesi var.
-  Bu bir takas, bedava değil.
+Bunlar kursta **yok** ve structure dersi de **değil**. İş sırasında akla gelirse
+buraya yazılır, plana değil:
+
+`ruff` + GitHub Actions CI · Terraform (IaC) · dbt · partition (`dt=`) ve partition
+pruning · CloudWatch alarm · Snowflake · Airflow/Dagster · streaming · mypy · Docker ·
+`chart.getTopArtists` gibi ikinci bir endpoint
+
+**Kurstan bilinçli olarak alınmayanlar:**
+
+- **Spotify API** → Last.fm. Sebep: Adım 1'de Last.fm ölçüldü, key alındı, fixture
+  kaydedildi (ADR-0004/0005/0006). Değiştirmek o işi çöpe atar. Last.fm ayrıca daha
+  basit: OAuth yok, tek `api_key` parametresi.
+- **`spotipy`** → düz `requests`. Last.fm'in resmî wrapper'ı yok, ve zaten hata yolunu
+  gizleyen kütüphane bu projede öğrenilecek şeyi de gizler.
+- **3 tablo** → **2 tablo** (`tracks`, `artists`). `chart.getTopTracks` album
+  döndürmüyor. JOIN dersi korunuyor.
+- **CSV** → **Parquet**. Crawler CSV'de tipi tahmin eder (kurs bile header uyarısı
+  yazmış); Parquet tipi kendi taşır. Değişiklik `to_csv` → `to_parquet`.
+
+---
+
+## Kursun kodundaki, farkında olunması gereken üç şey
+
+Bunlar kursu kötülemek için değil — plan bunları **bilerek** ele alıyor.
+
+1. **Transform Lambda yarış durumuna açık.** Kurs kodu S3 PUT ile tetiklenip
+   `to_processed/` altındaki **bütün** dosyaları listeleyip döngüye giriyor. İki dosya
+   arka arkaya düşerse iki invocation aynı dosyayı işler. → P3.2'de ele alınacak.
+2. **`AmazonS3FullAccess`.** Kurs bunu kendisi "production'da yapma" diye işaretlemiş.
+   → P3.4.
+3. **Zaman damgalı dosya adı = idempotency yok.** Aynı gün iki koşu iki dosya üretir ve
+   Athena ikisini de sayar. → P2.2 ve P3.2'de karar verilecek.

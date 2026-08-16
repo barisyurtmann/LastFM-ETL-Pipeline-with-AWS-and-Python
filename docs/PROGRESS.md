@@ -3,7 +3,7 @@
 Bu dosya projenin **tek durum kaynağıdır**: sadece *nerede olduğumu* tutar.
 Her oturumun başında okunur, her alt adımın sonunda güncellenir.
 
-> **Plan burada değildir.** Alt adım listesi, "bitti" tanımları ve bağımlılıklar için
+> **Plan burada değildir.** Alt adım listesi ve "bitti" tanımları için
 > → [`ROADMAP.md`](ROADMAP.md)
 
 Kural: bu dosya yalan söyleyebilir (güncellemeyi unutursan). `git log --oneline` söyleyemez.
@@ -12,68 +12,85 @@ Kural: bu dosya yalan söyleyebilir (güncellemeyi unutursan). `git log --onelin
 ---
 
 **Last updated:** 2026-08-15
-**Current step:** A — Extract + raw load (dlt) ([plan](ROADMAP.md#adım-a--extract--raw-load-dlt))
-**Next sub-step:** A.1 — dlt'nin modeli: source / resource / destination / pipeline / state
+**Current step:** P1 — Kurulum ve hesaplar ([plan](ROADMAP.md#adım-p1--kurulum-ve-hesaplar))
+**Next sub-step:** **P1.1** — `.env`'den config okuma, fail-fast, sır sızıntısı
 
 > **ADIM 0 TAMAMLANDI.** **ADIM 1 TAMAMLANDI** (1.1–1.8).
+> **Adım A–E (dlt/dbt) hiç başlanmadı ve iptal edildi** (ADR-0009).
 
 ### Sıradaki oturumda ilk iş
 
-Bu blok, iki makine arasında geçiş yaparken tek bakılacak yerdir.
-
 1. `git pull`
-2. Bu dosyayı ve `ROADMAP.md`'nin **Adım A** bölümünü oku. Plan tamamen değişti
-   (aşağıdaki revizyon bölümü) — eski 2/3/4/5 adımlarını arama, yoklar.
-3. Karar bekleyen tek şey: **önce `PROJECT_CONTEXT.md` düzeltmesi mi, doğrudan A.1 mi?**
-   (İkisi de yapılacak, sadece sıra seçilmedi.)
+2. `ROADMAP.md`'nin başındaki **"Öğrenilecek structure"** tablosunu oku — dokuz satır,
+   planın özü orada.
+3. `ROADMAP.md` → **Adım P1**. `A.x` alt adımlarını arama, yoklar.
+4. `PROJECT_CONTEXT.md` §1b (Çalışma anlaşması) — bir kez oku, sonra gerekmez.
+5. Doğrudan **P1.1**'e geçilir. Karar bekleyen bir şey yok.
+
+**Başlamadan iki fiziksel kontrol (ikisi de 1 dakika):**
+
+| # | Kontrol | Neden |
+|---|---|---|
+| 1 | `.git/index.lock` dosyasını **sil** | Yarım kalmış bir git işleminden kalma. Silinmezse ilk `git` komutu hata verir |
+| 2 | `.env` içinde `LASTFM_API_KEY` **dolu mu** | Bu makinedeki `.env` 0 byte. Key muhtemelen diğer makinede |
 
 **Açık işler:**
 
 | # | İş | Durum |
 |---|---|---|
-| 1 | `PROJECT_CONTEXT.md` §2 ve §4: ETL → ELT, mimari şemasına dlt/dbt/DuckDB | Yapılmadı. ADR-0008 bunu geçersiz kıldı. |
-| 2 | Repo adı `LastFM-ETL-...` → ELT | Yapılmadı. GitHub'da elle. |
-| 3 | 1.8 teyidi (opsiyonel, 2 dk) | `chart.getTopTracks`'e `&date=2020-01-01` ekleyip çıktı değişiyor mu bak. ADR-0006 "tarih parametresi yok" diyor ama bunun ölçüm mü okuma mı olduğu belirsiz. Sonuç C adımındaki backfill iptalinin dayanağı. |
-| 4 | ADR-0006'nın üç şartını dlt paginator'ına karşı doğrula | A.3'te yapılacak. Özellikle: "hedef sayıya ulaşmadan sayfalar biterse **hata**" — dlt bunu ifade edemiyorsa boşluk notlanacak. |
-| 5 | `PROGRESS.md`'nin "Tamamlananlar" geçmişi | Budanmadı, karar Barış'ta. |
+| 1 | `PROJECT_CONTEXT.md` mimari + araç düzeltmesi | **Yapıldı.** §4 kursun mimarisiyle eşlendi, §2 saf Python'a döndü |
+| 2 | Repo adı `LastFM-ETL-...` | **Değişmiyor.** Mimari yeniden ETL (ADR-0009); isim doğru |
+| 3 | Rate limit çelişkisi (`5/dakika` vs `5/saniye`) | **Düzeltildi.** Doğrusu **saniyede ~5**. `PROJECT_CONTEXT.md` §3 yanlıştı, not 17 doğruydu |
+| 4 | `PROGRESS.md` "Tamamlananlar" geçmişi | Budanmadı, **budanmayacak.** 9 günün kanıtı orada |
 
-**Kurulu olmayanlar:** `dlt` ve `dbt-duckdb` henüz bağımlılık olarak eklenmedi.
-A.1 bir okuma/anlama adımı — kurulum A.2'de.
+**Kurulu olmayanlar:** `requests`, `pandas`, `pyarrow`, `boto3` henüz bağımlılık olarak
+eklenmedi. P1.1 sadece config okumayı gerektirir; geri kalanı P2'de gelir.
 
 ---
 
-## ROADMAP REVİZYONU — 2026-08-15
+## ROADMAP REVİZYONU — 2026-08-15 (üçüncü ve son): plan kursun kendisinden türetildi
 
-Plan araç-merkezli tek tura çevrildi. 9 adım → 5 adım (A–E).
+Aynı gün üçüncü revizyon. İlk ikisi (9 adımlık elle plan, sonra A–E dlt/dbt planı) hiç
+uygulanmadan iptal edildi.
 
-| | Önce | Sonra |
-|---|---|---|
-| Extract + raw | Elle `requests` client, retry, backoff, sayfalama, atomic write (adım 2, 3, 4) | **dlt** — `rest_api` source + `filesystem` destination (adım A) |
-| Transform | Pydantic + pandas (adım 5) | **dbt-duckdb** — staging + mart + veri testleri (adım B) |
-| Mimari | ETL | **ELT** |
-| İptal | — | CLI/backfill, mypy strict, pre-commit, Docker, Glue Crawler |
+**Ölçüm — bütün revizyonların tek gerekçesi:**
 
-Gerekçeler: ADR-0007 (dlt), ADR-0008 (dbt + ELT). Eski numaraların nereye gittiği
-`ROADMAP.md`'deki eşleme tablosunda — eski numaralar **yeniden kullanılmadı**.
+| | Değer |
+|---|---|
+| Süre | 2026-08-07 → 2026-08-15 (9 gün) |
+| Commit | 31 |
+| `docs/` | 9.527 satır |
+| `src/` + `tests/` Python kodu | **0 satır** |
 
-**Bu revizyonun bedeli, açıkça:** elle HTTP client, retry ve atomic write yazma
-pratiği feda edildi. Karşılığı Adım 1'in ölçümleri + A.3/A.6'da dlt'nin davranışını
-inceleme. Takas bilinçli, bedava değil.
+**Teşhis:** planlar kaynağı olmadan yazılıyordu. Kapsamın dış bir çıpası olmadığı için
+hiçbir şey "kapsam dışı" olamıyordu; her bileşen bir tasarım tartışmasına dönüşüyordu.
 
-**Notlar ve ADR'ler kısılmadı.** Her adımda tam yazılıyor. Değişen tek şey:
-uygulamadan önce yazılan notlar kaynak etiketi taşıyacak —
-`> Kaynak: ÖLÇÜLDÜ (tarih)` veya `> Kaynak: OKUNDU — henüz uygulanmadı`.
-Gerekçe: `PROJECT_CONTEXT.md` bir süre "hatada HTTP 200 döner" diyordu; okunmuş
-bilgi notta ölçülmüş gibi durursa aynı hata tekrarlanır.
+**Bu revizyonun farkı:** plan artık **kursun dört parçasından** türetildi. Kapsam
+sorusunun mekanik bir cevabı var — kursta yoksa ve "structure" listesinde yoksa,
+sonraki tur. Gerekçe: ADR-0010.
 
-**Adım 1 kapanışı — 1.8:** rate limit ölçümü tamamlandı (header yok, belgelenen limit
-5 istek/sn, `limit` parametresinin davranışı ölçüldü, aktif sondaj bilinçli olarak
-yapılmadı). Tarih parametresi sorusu ADR-0006'da zaten kapalı: `chart.getTopTracks`
-tarih parametresi kabul etmiyor → **API'den backfill imkânsız**, geçmiş yalnızca
-ileriye doğru birikir. Bu, C adımındaki CLI/backfill iptalinin de gerekçesi.
+| | İlk plan | A–E (dlt/dbt) | **Şimdi (P1–P4)** |
+|---|---|---|---|
+| Kaynak | yok | yok | **kursun 4 parçası** |
+| Adım | 9 | 5 | **4** |
+| Alt adım | ~50 | 39 | **14** |
+| Yeni araç | — | dlt, dbt, DuckDB | **yok** |
+| Mimari | ETL | ELT | **ETL** (kurs) |
 
-**Bekleyen düzeltme:** `PROJECT_CONTEXT.md` ve repo adı hâlâ "ETL" diyor. ADR-0008
-bunu geçersiz kıldı. A.1'den önce düzeltilecek.
+**Kurstan dört bilinçli sapma** (gerekçeler ADR-0010'da):
+
+| Konu | Kurs | Burada | Sebep |
+|---|---|---|---|
+| API | Spotify (OAuth) | **Last.fm** (`api_key`) | Adım 1 Last.fm'i ölçtü, key ve fixture'lar hazır |
+| Kütüphane | `spotipy` | **`requests`** | Last.fm'in wrapper'ı yok; wrapper hata yolunu gizler |
+| Tablo | 3 (albums, artists, songs) | **2** (tracks, artists) | `chart.getTopTracks` album döndürmüyor. JOIN dersi duruyor |
+| Format | CSV | **Parquet** | Crawler CSV'de tipi tahmin eder; Parquet tipi taşır |
+
+**Doküman kuralı:** not artık **koddan sonra** yazılıyor ve hiçbir adımı bloklamıyor.
+Uzunluk sınırı yok. Gerekçe: ADR-0007 sıfır kod varken yazıldı ve aynı gün supersede
+edildi. Uygulanmamış bilgiyi dondurmak, yanlış bilgiyi dondurmaktır.
+
+Eski numaralar (`0–9`, `A–E`) **yeniden kullanılmadı**. Eşleme `ROADMAP.md`'de.
 
 ---
 
@@ -521,7 +538,8 @@ bunu geçersiz kıldı. A.1'den önce düzeltilecek.
 - `.python-version` yok. `requires-python = ">=3.11"` bir aralık — iki makinede farklı
   yorumlayıcı seçilebilir (ev: 3.14.5). Sapma görülürse `uv python install` +
   `.python-version` ile sabitlenecek. Şimdilik bilinçli olarak eklenmedi.
-- Adım 8.5'te CI'da `uv`'nin **kendi sürümü** sabitlenecek. Bağımlılıkları kilitleyip
+- CI **bu turun kapsamında değil** (`ROADMAP.md` → Sonraki tur). Kurulduğunda `uv`'nin
+  **kendi sürümü** de sabitlenmeli. Bağımlılıkları kilitleyip
   aracı kilitlememek, "kendiliğinden bozulan build" riskini açık bırakır.
 - **Chart'ın sıralama ölçütü bilinmiyor.** 1.7'de ölçüldü: sıra ne `playcount` ne
   `listeners` ile uyumlu, 500. sayfada 1. sayfadan büyük `playcount`'lar var. Yani chart
@@ -530,15 +548,17 @@ bunu geçersiz kıldı. A.1'den önce düzeltilecek.
   analiz yapılırken (`rank` ile `playcount` birlikte yorumlanırken) bilinmesi gerek.
   Doğrulanamaz — Last.fm ölçütü belgelemiyor. Şema notu olarak kalsın.
 - **`rank` bazı SQL lehçelerinde ayrılmış kelime.** Athena/Presto'da `RANK()` bir pencere
-  fonksiyonu. Kolon adı olarak sorun çıkarırsa `chart_rank`'e dönülecek. → 9.x'te test.
-- **Adım 4'e devredilen borç:** raw katman her sayfayı **ayrı** ve `@attr` ile birlikte
+  fonksiyonu. Kolon adı olarak sorun çıkarırsa `chart_rank`'e dönülecek. → **P4.2**'de test (Athena).
+- **P2.2'ye devredilen borç:** raw katman her sayfayı **ayrı** ve `@attr` ile birlikte
   saklamak zorunda; aksi halde `rank` kalıcı olarak kurtarılamaz hale gelir. Bu bir
-  "açık soru" değil, unutulması muhtemel bir **kısıt**. → 4.x.
+  "açık soru" değil, unutulması muhtemel bir **kısıt**. → **P2.2**.
 - **Aynı gün içinde sayfa kayması.** Chart sayfalar çekilirken yeniden sıralanırsa aynı
   parça iki sayfada görünebilir ve anahtar tek `snapshot_date` içinde çakışır. Gözlenmedi
-  (iki fixture farklı sayfalar, kesişim yok) ama çürütülmedi de. → 4.5 / 5.8.
+  (iki fixture farklı sayfalar, kesişim yok) ama çürütülmedi de. → **P2.3 / P2.4**.
 - **`chart.getTopTracks` tarih parametresi almıyor** iddiası API dokümanına dayanıyor,
-  ölçülmedi. Doğruysa backfill yalnızca raw katmandan yapılabilir. → 1.8.
+  ölçülmedi. **Bu soru artık kararı değiştirmiyor** — backfill ve CLI zaten iptal
+  (`ROADMAP.md` → Sonraki tur). P2.1'de client yazılırken 2 dakikada teyit edilebilir; edilmezse de
+  plan aynı kalır. Kapatıldı.
 
 ## Git geçmişinde görünmeyen kararlar
 
@@ -558,5 +578,7 @@ bunu geçersiz kıldı. A.1'den önce düzeltilecek.
   `.env.example`'ı kopyalayıp gerçek key'i yazmak.
 - `curl` çağrılarından önce `.env`'i oturuma yükle (`docs/notes/11` §3). Sır komut
   satırına elle yazılmaz.
-- Adım 1 kod adımı **değil**. Çıktısı: kaydedilmiş gerçek payload + hata payload'ı +
-  grain cümlesi + hedef şema tablosu. Kod yazma isteği gelirse Adım 3'e ait demektir.
+- **Adım 1 bitti.** P1 hesap/sır kurulumu; **P2'den itibaren** bir oturumun çıktısı
+  `src/` altında çalışan koddur. Oturum sonunda `src/` boşsa o oturum kapsam
+  tartışmasına gitmiştir; `PROJECT_CONTEXT.md` §1b'yi aç.
+- **Not koddan sonra yazılır.** Bir alt adıma not yazarak başlanıyorsa sıra ters.

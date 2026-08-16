@@ -14,24 +14,37 @@ Bu dosya projenin **sabit sözleşmesidir**: hedef, tercihler, mimari. Nadiren d
 veri kalitesi, idempotency gibi konularda tecrübem yok.
 
 **Amaç:** Öğrenme + portfolyo. Sonunda GitHub'da durabilecek, mülakatta anlatabileceğim,
-gerçekten çalışan bir pipeline istiyorum. Ama asıl kazanım kodun kendisi değil, kod yazarken
-öğrendiğim karar verme biçimi.
+**gerçekten uçtan uca çalışan** bir pipeline istiyorum.
 
-**Öğrenme tarzım:** Adım adım, açıklaya açıklaya. Kodu ben yazmak istiyorum — Claude'un
-benim yerime `src/` altına dosya oluşturmasını istemiyorum.
+**Bu projenin kökeni.** DataVidhya "Spotify Pipeline" dersinin **dört parçasını**
+uyguluyorum:
 
-**Kapsam:** Tek tek dosyaların içeriğini değil, **projenin en tepesinden en dibine kadar**
-her kararı öğrenmek istiyorum. Klasör yapısının neden böyle olduğundan, bir değişkenin neden
-o isimle çağrıldığına kadar. Git akışı, isimlendirme kuralları, tooling seçimi, bağımlılık
-yönetimi — bunlar "konu dışı temel şeyler" değil, konunun kendisi.
+| Ders | Konu |
+|---|---|
+| P1 | Mimari, API kimlik bilgileri, AWS servisleri, S3 bucket'ları |
+| P2 | Local Python: extract + nested JSON'u tablolara düzleştir |
+| P3 | İki Lambda, layer, env var, CloudWatch + S3 tetikleyicileri, IAM |
+| P4 | Glue Crawler, Data Catalog, Athena SQL |
+
+Kursun versiyonu kasten basit: kimlik bilgileri kodda yazılı, kod Lambda konsol
+editörüne yapıştırılıyor, `src/` yok, `.env`/`.venv` yok, test yok, paketleme yok,
+IAM `AmazonS3FullAccess`. **Claude ile çalışmamın sebebi tam olarak bu boşluk** — bir
+profesyonelin aynı mimariyi baştan sona nasıl kuracağını öğrenmek.
+
+**Kritik kısıt: kapsam kurstur — ne eksik, ne fazla.** Öğrenmek istediğim şey
+mimarinin kendisi değil, *etrafındaki yapı*: dizin düzeni, config ve sır yönetimi,
+hata yolları, test, paketleme, IAM, maliyet. Kursta olmayan ve bu listede de olmayan
+her şey `ROADMAP.md` → "Sonraki tur". Gerekçe: ADR-0010.
+
+**Öğrenme tarzım:** Adım adım, açıklaya açıklaya. **Kodu ben yazarım.** Claude `src/`
+altına dosya oluşturmaz; sohbette gösterir, ben yazarım.
 
 ### Geçmiş deneyim — tekrarlamak istemediğim hatalar
 
 **Not: Aşağıdaki proje terk edildi. Kodu kullanılmayacak, sadece ders listesi.**
 
 Bir Spotify ETL projesine başlamıştım. Spotify API'de aradığım veriye ulaşamayınca
-(audio features endpoint'i kısıtlandı, playlist verisi yetersiz kaldı) Last.fm'e geçmeye
-karar verdim. O denemeden çıkardıklarım:
+(audio features endpoint'i kısıtlandı, playlist verisi yetersiz kaldı) Last.fm'e geçtim.
 
 - ✅ JSON formatında yapılandırılmış loglama kurdum
 - ✅ Config sınıfında `__post_init__` ile doğrulama yaptım
@@ -46,6 +59,40 @@ klasör yapısı değil.
 
 ---
 
+## 1b. Çalışma anlaşması
+
+> Bu bölüm 2026-08-15'te eklendi. Sebebi §1'deki hatanın **farklı bir kılıkta tekrar
+> etmesi**: geçmiş projede boş bir klasör yapısı vardı, bu projede dolu bir doküman
+> klasörü. İkisinde de çalışan pipeline yoktu.
+
+**Ölçüm:** 9 günde 31 commit, 9.527 satır doküman, 0 satır pipeline kodu.
+
+**Teşhis:** Doküman kötü değildi — ADR-0005'in grain analizi ve not 17'nin rate limit
+protokolü gerçek iş. Sorun **sıra**: doküman koddan önce yazılıyordu. Uygulanmamış
+bilgi dondurulunca iki şey oluyor:
+
+1. Yanlış olduğu anlaşılmıyor. `PROJECT_CONTEXT.md` bir süre "Last.fm hatada bile
+   HTTP 200 döner" dedi. Ölçüm bunu çürüttü (1.3).
+2. Karar, dayandığı ölçüm olmadan veriliyor. ADR-0007 (dlt) 0 satır kod varken
+   yazıldı; ADR-0008 aynı gün onu kısmen geçersiz kıldı; ADR-0009 ikisini de
+   supersede etti. Üç ADR, sıfır çalışan kod.
+
+**Anlaşma:**
+
+| Konu | Kural |
+|---|---|
+| Not | Adım **çalıştıktan sonra** yazılır. Uzunluk serbest. Hiçbir adımı bloklamaz |
+| ADR | Sadece geri alması pahalı kararlar için. `git revert` yetiyorsa commit mesajıdır |
+| Alt adım bütçesi | 14. Yeni alt adım ancak bir eskisi silinerek eklenir |
+| Adım süresi | İki oturumu aşarsa kapsam şişmiştir — alt adım kesilir |
+| Araç | Bu turda yeni araç yok. Araç, veriden sonra öğrenilir |
+| Kapsam şişmesi | "Şunu da ekleyelim" cümlesi bir uyarıdır. Aday `ROADMAP.md`'nin "Sonraki tur" bölümüne yazılır, plana değil |
+
+**Claude'un görevi bu anlaşmayı korumak.** Kapsam şişerse, üç alt adım tek mesajda
+anlatılırsa veya bir not koddan önce yazılmaya başlanırsa — durdurulur.
+
+---
+
 ## 2. Teknik tercihler
 
 | Konu | Karar |
@@ -54,10 +101,18 @@ klasör yapısı değil.
 | Kod / docstring / commit / README / ADR dili | İngilizce |
 | `docs/notes/` dili | Türkçe (öğrenme defteri) |
 | Python | 3.12+ |
-| Paket yönetimi | `uv` veya `pip` + `pyproject.toml` |
-| Kapsam | Önce tamamen local çalıştır, sonra aynı kodu AWS'ye taşı |
-| Bulut | AWS (S3, Lambda, EventBridge, Glue, Athena) |
-| Depo formatı | Raw: JSON — Transformed: Parquet |
+| Paket yönetimi | `uv`, project mode (ADR-0003) |
+| HTTP | `requests` — elle yazılan client, retry ve backoff dahil |
+| Transform | `pandas` (düzleştirme, dedupe) + `pyarrow` (Parquet). **Framework yok** (ADR-0009) |
+| AWS SDK | `boto3` |
+| Kapsam | Kursun dört parçası (ADR-0010). Local'de yaz ve doğrula → **aynı fonksiyonları** Lambda'ya taşı |
+| Bulut | AWS: S3 (×2 bucket), Lambda (×2), EventBridge, Glue Crawler + Data Catalog, Athena |
+| Depo formatı | Raw: **JSON** (hiç dokunulmamış) — Transformed: **Parquet** |
+| Tablolar | `tracks` ve `artists` — **iki tablo**. `chart.getTopTracks` album döndürmüyor |
+| IaC | Yok. Konsol + `boto3`. Terraform sonraki tur |
+
+**Bilinçli olarak kullanılmayanlar:** dlt, dbt, DuckDB, Docker, mypy, pre-commit,
+Airflow. Gerekçeler ADR-0009, ADR-0010 ve `ROADMAP.md` → "Sonraki tur"da.
 
 ---
 
@@ -73,7 +128,7 @@ klasör yapısı değil.
 | Auth | OAuth, token süresi dolar | Sadece `api_key` query parametresi |
 | Endpoint | Kaynak başına ayrı URL | **Tek URL**, `method` parametresi değişir |
 | Varsayılan format | JSON | **XML** — `format=json` göndermek zorunlu |
-| Hata davranışı | HTTP status kodu doğru | Status **ve** gövde birlikte hata taşır (bkz. aşağıdaki ölçüm) |
+| Hata davranışı | HTTP status kodu doğru | Status **ve** gövde birlikte hata taşır |
 
 ### İki kritik tuzak
 
@@ -86,9 +141,9 @@ klasör yapısı değil.
    | Bozuk `api_key` | `403` | `{"message":"Invalid API key...","error":10}` |
    | Bozuk `method` | `400` | `{"message":"Invalid Method...","error":3}` |
 
-   **Düzeltme:** bu dosyanın önceki hâli "hatada bile HTTP 200 döner" diyordu.
-   Ölçüm bunu bu iki hata için çürüttü — Last.fm status kodlarını doğru kullanıyor.
-   İddia, kod yazılmadan önce ölçüldüğü için ucuza düzeltildi.
+   **Düzeltme kaydı:** bu dosyanın önceki hâli "hatada bile HTTP 200 döner" diyordu.
+   Ölçüm bunu bu iki hata için çürüttü. İddia, kod yazılmadan önce ölçüldüğü için
+   ucuza düzeltildi.
 
    **Yine de `raise_for_status()` tek başına yetmez.** Üç sebeple:
    - Status ayrıntıyı söylemez: `403`, "key geçersiz" (10) ile "key askıya alındı"
@@ -97,67 +152,105 @@ klasör yapısı değil.
    - `raise_for_status()` fırladığı anda **gövde okunmadan akış kopar** — teşhis
      bilgisi kaybolur. Doğru sıra: önce gövdeyi oku, sonra hata fırlat.
 
-   **Henüz ölçülmedi:** geçerli key + geçerli metod ama sonuç yok durumu
-   (`200` + boş liste mi, yoksa `error` mü). Sessiz veri kaybının en olası yeri;
-   Adım 1.5'te bakılacak.
+   Bu, P2.1'in doğrudan gereksinimidir.
 
 ### İşe yarar metodlar
 
 - **`chart.getTopTracks` — global en popüler parçalar. İlk dilimin metodu (1.4'te seçildi).**
-- `chart.getTopArtists` — global en popüler sanatçılar
-- `artist.getTopTracks` — bir sanatçının en popüler parçaları
-- `geo.getTopArtists` — ülke bazlı (`country=turkey`)
-- `tag.getTopTracks` — tür/etiket bazlı
+- `chart.getTopArtists` · `artist.getTopTracks` · `geo.getTopArtists` · `tag.getTopTracks`
 
 **Neden `chart.getTopTracks`:** `getTopArtists` düz bir tablo döndürür — transform katmanı
 `DataFrame(data)` çağrısına indirgenir ve öğrenilecek bir şey kalmaz. `getTopTracks` iç içe
 bir `artist` nesnesi, `duration` gibi sayısal bir alan ve aynı isimli alanın metoda göre
 farklı tip alması gibi gerçek dönüşüm problemleri taşır. Seçim satır sayısı için değil,
-**şema derinliği** için yapıldı — satır sayısı zaten `limit` parametresine bağlı.
+**şema derinliği** için yapıldı.
+
+**Tarih parametresi yok.** `chart.getTopTracks` geçmişe dönük sorgu kabul etmiyor
+(ADR-0006). Sonucu: **API'den backfill imkânsız**, geçmiş yalnızca ileriye doğru birikir.
+CLI ve backfill döngüsünün iptal gerekçesi budur.
 
 ### Rate limit
 
-Resmî olarak dakikada ~5 istek (IP başına). Yani retry ve backoff süs değil, zorunluluk.
+**Saniyede ~5 istek** (IP başına, 5 dakikalık ortalama üzerinden). Kaynak: Last.fm API
+kullanım şartları, not 17'de kayıtlı.
+
+> **Düzeltme:** bu dosyanın önceki hâli "dakikada ~5 istek" diyordu — yanlış, ve
+> `PROGRESS.md`'nin 1.8 kaydıyla çelişiyordu. Aradaki fark 60 kat; bir throttle
+> tasarımını tamamen değiştirecek büyüklükte.
+
+Ayrıca ölçüldü (1.8): yanıtta `RateLimit-*` header'ı **yok**. Yani kalan kotayı
+sunucudan öğrenme imkânı yok — throttle istemci tarafında kendi sayacını tutmalı.
 
 ---
 
 ## 4. Hedef mimari
 
+Kursun mimarisi, Last.fm'e uyarlanmış. ADR-0010 bunu bağlayıcı kapsam olarak kabul eder.
+
 ```
 Last.fm API
     │
     ▼
-[EXTRACT]  api client → ham JSON, hiç dokunulmadan
-    │
-    ▼
-raw/ ── s3://bucket/raw/lastfm/method=chart_gettoptracks/dt=2026-08-07/data.json
-    │      (immutable — bir kez yazılır, asla değiştirilmez)
-    ▼
-[TRANSFORM]  şema doğrulama → düzleştirme → tip dönüşümü
-    │
-    ▼
-curated/ ── s3://bucket/curated/top_tracks/dt=2026-08-07/part-0.parquet
-    │
-    ▼
-[LOAD]  Glue Crawler → Data Catalog → Athena ile SQL
+EventBridge (günlük)  ──►  Lambda: extract  ──►  S3 bucket 1 (raw)
+                                                  raw/to_processed/*.json
+                                                       │
+                                                  (PUT event)
+                                                       ▼
+                                              Lambda: transform
+                                                       │
+                                    ┌──────────────────┴─────────────┐
+                                    ▼                                ▼
+                        S3 bucket 2 (transformed)          raw/processed/ (arşiv)
+                        tracks/*.parquet
+                        artists/*.parquet
+                                    │
+                                    ▼
+                            Glue Crawler
+                                    │
+                                    ▼
+                       Glue Data Catalog  (lastfm_db)
+                                    │
+                                    ▼
+                              Athena (SQL)
 ```
 
-**Tetikleyici:** Local'de manuel / cron → AWS'de EventBridge (günlük)
+**İki bucket, kursta olduğu gibi:**
 
-Local'de veri gölü `/data/raw/` ve `/data/curated/` altında yaşar — S3 yapısını birebir
-taklit eder, böylece AWS'ye taşırken yol mantığı değişmez. `/data/` gitignore'ludur.
+| Bucket | İçerik |
+|---|---|
+| `...-lastfm-raw-<sen>` | `raw/to_processed/` → yeni dosyalar · `raw/processed/` → işlenmiş arşiv |
+| `...-lastfm-transformed-<sen>` | `tracks/` · `artists/` (Parquet) |
+
+Ayrı bucket olmasının sebebi sadece kursu takip etmek değil: transform Lambda'sının
+çıktısı kendisini tetikleyen bucket'a yazılırsa **sonsuz döngü** olur. İki bucket bunu
+yapısal olarak imkânsız kılar.
+
+`raw/to_processed/` → `raw/processed/` taşıması kursun **idempotency mekanizmasıdır**:
+işlenmiş dosya bir daha işlenmez ve neyin işlendiği görülebilir. P3.2'de bilinçli
+kurulacak, kopyalanmayacak.
+
+**Diyagrama dair iki not:**
+
+- Kurs "CloudWatch (daily trigger)" diyor. Bu servisin güncel adı **EventBridge**.
+  Aynı şey, isim değişti.
+- Glue Crawler'ın **koşu başına maliyeti var** (~$0.44). Sabit bir şema için gereksiz;
+  alternatifi tabloyu bir kez elle tanımlamak. Kursta olduğu için kullanılıyor,
+  maliyeti P4.1'de ölçülüyor. Gerekçe: ADR-0010.
+
+**Geliştirme verisi:** `tests/fixtures/lastfm/` altındaki kayıtlı payload'lar (ADR-0004).
+Transform yazılırken her denemede S3'e gidilmez — fixture'la iterasyon, S3'e gerçek koşu.
+
+---
 
 ---
 
 ## 5. Yol haritası
 
-Proje 9 adımdan oluşur. Adımların alt adımları, "bitti" tanımları, ADR adayları ve
-aralarındaki bağımlılıklar → [`ROADMAP.md`](ROADMAP.md)
+Proje **dört adımdan** (P1–P4, kursun dört parçası), toplam **14 alt adımdan** oluşur.
+Alt adımlar, "bitti" tanımları ve öğrenilecek structure dersleri → [`ROADMAP.md`](ROADMAP.md)
 
 Burada tekrarlanmaz. Plan revize edilirken iki dosyayı senkron tutmak, er ya da geç
 tutmamak demektir.
-
-Her adım bitince commit atılır. Bir sonrakine geçmeden önce çalıştığı doğrulanır.
 
 ---
 
@@ -166,8 +259,6 @@ Her adım bitince commit atılır. Bir sonrakine geçmeden önce çalıştığı
 Bu **genel** listedir, her adım için geçerlidir. Adıma özel ek şartlar
 [`ROADMAP.md`](ROADMAP.md)'de her adımın altında yazar.
 
-Bir adım şu şartları sağlamadan bitmiş sayılmaz:
-
 - [ ] Kod çalışıyor ve ben **elimle** çalıştırıp doğruladım
 - [ ] İki kere çalıştırdığımda aynı sonucu veriyor (idempotent)
 - [ ] Hata durumunda **sessizce başarılı olmuyor** — gürültülü şekilde patlıyor
@@ -175,8 +266,8 @@ Bir adım şu şartları sağlamadan bitmiş sayılmaz:
 - [ ] Sırf "ileride lazım olur" diye yazılmış kod yok
 - [ ] Anlamlı bir commit mesajıyla commit edildi
 - [ ] `docs/PROGRESS.md` güncellendi
-- [ ] Tasarım kararı içeriyorsa `docs/adr/` altına ADR yazıldı
-- [ ] Yeni öğrenilen genel bilgi `docs/notes/` altına yazıldı
+- [ ] Geri alması pahalı bir karar içeriyorsa `docs/adr/` altına ADR yazıldı
+- [ ] Not yazıldıysa **koddan sonra** yazıldı
 
 ---
 
@@ -185,16 +276,16 @@ Bir adım şu şartları sağlamadan bitmiş sayılmaz:
 Bu terimler geçtiğinde üstünden hızla geçme — durup açıkla:
 
 **Temel:** idempotency · immutable raw layer · data grain · partitioning ·
-backfill · watermark / incremental load · schema-on-read vs schema-on-write
+watermark / incremental load · schema-on-read vs schema-on-write
 
 **Kalite:** data contract · şema doğrulama · null/uniqueness/row-count kontrolleri ·
 fail-fast vs fail-safe · dead letter queue
 
-**Operasyon:** exponential backoff · circuit breaker · structured logging ·
-observability (log/metric/trace) · alerting · SLA
+**Operasyon:** exponential backoff · structured logging · observability · alerting ·
+least privilege · at-least-once delivery
 
 **Mimari:** medallion (bronze/silver/gold) · ELT vs ETL · batch vs streaming ·
-orchestration DAG'ı · maliyet optimizasyonu (dosya boyutu, partition sayısı)
+maliyet optimizasyonu (dosya boyutu, partition sayısı, taranan byte)
 
 ---
 
@@ -202,16 +293,16 @@ orchestration DAG'ı · maliyet optimizasyonu (dosya boyutu, partition sayısı)
 
 | Yol | Ne tutar | Dil | Ne sıklıkla değişir |
 |---|---|---|---|
-| `docs/PROJECT_CONTEXT.md` | Sabit sözleşme — hedef, tercihler, mimari | TR | Nadiren |
+| `docs/PROJECT_CONTEXT.md` | Sabit sözleşme — hedef, tercihler, mimari, çalışma anlaşması | TR | Nadiren |
 | `docs/ROADMAP.md` | **Plan.** Alt adımlar, bitti tanımları, bağımlılıklar | TR | Adım revize edildikçe |
-| `docs/PROGRESS.md` | **Güncel durum.** Tek durum kaynağı. | TR | Her alt adımda |
-| `docs/adr/` | Bu projeye özel mimari kararlar | EN | Karar çıktıkça |
-| `docs/notes/` | Genel öğrenme notları | TR | Konu öğrenildikçe |
-| `docs/TOOLING.md` | **Araç manzarası.** Katmanlar, seçim kriterleri, maliyet modelleri | TR | Öğrendikçe — canlı belge |
+| `docs/PROGRESS.md` | **Güncel durum.** Tek durum kaynağı | TR | Her alt adımda |
+| `docs/adr/` | Bu projeye özel, geri alması pahalı kararlar | EN | Karar çıktıkça |
+| `docs/notes/` | Genel öğrenme notları | TR | Adım **bittikten sonra** |
+| `docs/TOOLING.md` | Araç manzarası — başvuru haritası | TR | Nadiren. Bu turda araç seçilmiyor |
 
 `adr/` mi `notes/` mi? Testi: *"Bu bilgi başka bir projede de geçerli mi?"*
 Evetse `notes/`, hayırsa `adr/`.
 
 `notes/` mi `TOOLING.md` mi? Testi: *"Bu bilgi bir alt adıma bağlı mı?"*
 Bağlıysa `notes/` — o anın öğrenmesidir, dondurulur. Bağlı değilse ve **araç seçerken**
-açılacaksa `TOOLING.md` — başvuru haritasıdır, güncellenir.
+açılacaksa `TOOLING.md`.

@@ -1,7 +1,10 @@
 # ADR-0008: Transform with dbt on DuckDB instead of Python
 
-**Status:** Accepted
+**Status:** Superseded by [ADR-0009](0009-return-to-a-hand-written-python-pipeline.md)
 **Date:** 2026-08-15
+
+> Superseded on 2026-08-15, before any implementation. The body below is left unedited.
+> dbt is deferred rather than rejected — see `ROADMAP.md`, "Sonraki tur".
 
 ## Context
 

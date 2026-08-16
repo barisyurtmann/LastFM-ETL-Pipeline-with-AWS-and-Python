@@ -66,5 +66,21 @@ only upsides was not a real decision.
 | [0004](0004-store-recorded-api-payloads-as-test-fixtures.md) | Store recorded API payloads as test fixtures | Accepted |
 | [0005](0005-define-the-data-grain-as-a-daily-chart-snapshot.md) | Define the data grain as a daily chart snapshot | Accepted |
 | [0006](0006-limit-ingestion-to-the-top-100-chart-positions.md) | Limit ingestion to the top 100 chart positions | Accepted |
-| [0007](0007-adopt-dlt-for-extraction-and-raw-loading.md) | Adopt dlt for extraction and raw loading | Accepted |
-| [0008](0008-transform-with-dbt-on-duckdb.md) | Transform with dbt on DuckDB instead of Python | Accepted |
+| [0007](0007-adopt-dlt-for-extraction-and-raw-loading.md) | Adopt dlt for extraction and raw loading | Superseded by 0009 |
+| [0008](0008-transform-with-dbt-on-duckdb.md) | Transform with dbt on DuckDB instead of Python | Superseded by 0009 |
+| [0009](0009-return-to-a-hand-written-python-pipeline.md) | Return to a hand-written Python pipeline | Accepted |
+| [0010](0010-adopt-the-course-architecture-as-the-project-scope.md) | Adopt the course architecture as the project scope | Accepted |
+
+## When is a decision an ADR?
+
+Added 2026-08-15, after three ADRs on the same subject were written and two of them
+superseded without a line of implementation behind any of them.
+
+An ADR is warranted when **reversing the decision later would be expensive** — when it
+shapes the directory layout, the data contract, the dependency set, or something already
+deployed. If a choice can be undone with `git revert` and no downstream rework, it is a
+commit message, not an ADR.
+
+An ADR is written **after the code that justifies it works**, not before. A decision
+recorded ahead of its implementation records a prediction; this repository's history
+shows what that costs.
