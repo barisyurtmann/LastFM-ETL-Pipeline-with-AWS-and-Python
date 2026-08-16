@@ -11,37 +11,47 @@ Kural: bu dosya yalan söyleyebilir (güncellemeyi unutursan). `git log --onelin
 
 ---
 
-**Last updated:** 2026-08-15
+**Last updated:** 2026-08-15 (ev makinesi, gece)
 **Current step:** P1 — Kurulum ve hesaplar ([plan](ROADMAP.md#adım-p1--kurulum-ve-hesaplar))
-**Next sub-step:** **P1.1** — `.env`'den config okuma, fail-fast, sır sızıntısı
+**Next sub-step:** **P1.1 — BAŞLADI, cevap bekliyor.** Aşağıdaki soruyu cevaplayarak devam et.
 
 > **ADIM 0 TAMAMLANDI.** **ADIM 1 TAMAMLANDI** (1.1–1.8).
 > **Adım A–E (dlt/dbt) hiç başlanmadı ve iptal edildi** (ADR-0009).
+> **Bu oturumda plan yeniden yazıldı, kod yazılmadı.** `src/` hâlâ 0 satır.
 
-### Sıradaki oturumda ilk iş
+### Sıradaki oturumda ilk iş (iş makinesi)
 
 1. `git pull`
-2. `ROADMAP.md`'nin başındaki **"Öğrenilecek structure"** tablosunu oku — dokuz satır,
-   planın özü orada.
-3. `ROADMAP.md` → **Adım P1**. `A.x` alt adımlarını arama, yoklar.
-4. `PROJECT_CONTEXT.md` §1b (Çalışma anlaşması) — bir kez oku, sonra gerekmez.
-5. Doğrudan **P1.1**'e geçilir. Karar bekleyen bir şey yok.
+2. `ROADMAP.md` → **"Öğrenilecek structure"** tablosu (dokuz satır) + **Adım P1**.
+   `A.x` alt adımlarını arama, yoklar.
+3. `.env` içinde `LASTFM_API_KEY` dolu mu — kontrol et. (Ev makinesinde 0 byte.)
+4. Sohbete **aşağıdaki soruyu cevaplayarak** başla. P1.1 tam orada duruyor.
 
-**Başlamadan iki fiziksel kontrol (ikisi de 1 dakika):**
+**P1.1 — cevaplanacak soru (sohbet burada kaldı):**
 
-| # | Kontrol | Neden |
-|---|---|---|
-| 1 | `.git/index.lock` dosyasını **sil** | Yarım kalmış bir git işleminden kalma. Silinmezse ilk `git` komutu hata verir |
-| 2 | `.env` içinde `LASTFM_API_KEY` **dolu mu** | Bu makinedeki `.env` 0 byte. Key muhtemelen diğer makinede |
+> Kurs `client_id = "your_client_id"` yazıyor. Bunun yanlış olduğu açık.
+> Elde zaten `.env` (gerçek key) ve `.env.example` (sözleşme) var. Şimdi bir
+> **üçüncü** dosya yazılacak: `src/lastfm_etl/config.py`.
+>
+> **(a)** İhtiyaç duyulan yerde doğrudan `os.environ["LASTFM_API_KEY"]` yazsak ne
+> kaybederiz? Ayrı bir config modülü tam olarak hangi problemi çözüyor?
+>
+> **(b)** `.env` de diskte duran düz metin bir dosya. Key'i koda gömmekle `.env`'e
+> koymak arasında gerçekte ne değişiyor? "Daha güvenli" yetmez — neyin, kime karşı?
+
+Cevap verilince sıra: NASIL → SEN YAZ (`config.py`) → KONTROL.
 
 **Açık işler:**
 
 | # | İş | Durum |
 |---|---|---|
-| 1 | `PROJECT_CONTEXT.md` mimari + araç düzeltmesi | **Yapıldı.** §4 kursun mimarisiyle eşlendi, §2 saf Python'a döndü |
-| 2 | Repo adı `LastFM-ETL-...` | **Değişmiyor.** Mimari yeniden ETL (ADR-0009); isim doğru |
-| 3 | Rate limit çelişkisi (`5/dakika` vs `5/saniye`) | **Düzeltildi.** Doğrusu **saniyede ~5**. `PROJECT_CONTEXT.md` §3 yanlıştı, not 17 doğruydu |
-| 4 | `PROGRESS.md` "Tamamlananlar" geçmişi | Budanmadı, **budanmayacak.** 9 günün kanıtı orada |
+| 1 | `.env.example` içinde **Türkçe yorumlar** var | Kural ihlali (portfolyo repo'su İngilizce). Ayrıca "2.5'teki fail-fast" diyor — 2.5 diye adım kalmadı. → **P1.1 sonunda düzelt** |
+| 2 | `pyproject.toml` `requires-python = ">=3.11"` | `PROJECT_CONTEXT` §2 "3.12+" diyor. Biri yanlış. → **P1.1 sonunda karar ver** |
+| 3 | `PROJECT_CONTEXT.md` mimari + araç düzeltmesi | **Yapıldı.** §4 kursun mimarisiyle eşlendi, §2 saf Python'a döndü |
+| 4 | Repo adı `LastFM-ETL-...` | **Değişmiyor.** Mimari yeniden ETL (ADR-0009); isim doğru |
+| 5 | Rate limit çelişkisi (`5/dakika` vs `5/saniye`) | **Düzeltildi.** Doğrusu **saniyede ~5**. `PROJECT_CONTEXT.md` §3 yanlıştı, not 17 doğruydu |
+| 6 | ADR-0009 başlığı (`Retire dlt and dbt` önerisi) | **Kapatıldı.** Olduğu gibi kalıyor; başlık tartışması kapsam şişmesidir |
+| 7 | `PROGRESS.md` "Tamamlananlar" geçmişi | Budanmadı, **budanmayacak.** 9 günün kanıtı orada |
 
 **Kurulu olmayanlar:** `requests`, `pandas`, `pyarrow`, `boto3` henüz bağımlılık olarak
 eklenmedi. P1.1 sadece config okumayı gerektirir; geri kalanı P2'de gelir.
