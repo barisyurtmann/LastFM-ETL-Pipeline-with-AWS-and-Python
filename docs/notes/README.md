@@ -32,6 +32,7 @@ Testi tek soru: **"Bu bilgi başka bir projede de geçerli mi?"**
 | [15](15-schema-design-and-field-elimination.md) | Şema tasarımı: alan eleme (4 sınav), null'ın yedi kılığı, tip seçimi, isimlendirme, ordinal materyalizasyonu | 1.7 |
 | [16](16-shell-loops-and-measurement.md) | Shell'de döngü (`for`/`while`, form seçimi, PowerShell), `curl -w` ile ölçüm, gecikme istatistikleri, ölçüm araçları | 1.8 |
 | [17](17-rate-limits-discovery-and-backoff.md) | Rate limit: dört aşamalı keşif protokolü (bash), header standartları, limit algoritmaları, üstel backoff + jitter, retry taksonomisi | 1.8 |
+| [18](18-config-secrets-and-fail-fast.md) | Config vs sabit ayrımı, `.env` tehdit modeli, fail-fast, maskeli `__repr__`, `dataclass` vs `pydantic-settings`, `python-dotenv` öncelik sırası | P1.1 |
 
 ---
 

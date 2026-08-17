@@ -11,35 +11,89 @@ Kural: bu dosya yalan söyleyebilir (güncellemeyi unutursan). `git log --onelin
 
 ---
 
-**Last updated:** 2026-08-15 (ev makinesi, gece)
+**Last updated:** 2026-08-17 (iş makinesi, akşam)
 **Current step:** P1 — Kurulum ve hesaplar ([plan](ROADMAP.md#adım-p1--kurulum-ve-hesaplar))
-**Next sub-step:** **P1.1 — BAŞLADI, cevap bekliyor.** Aşağıdaki soruyu cevaplayarak devam et.
+**Next sub-step:** **P1.1 — kod yazıldı, KONTROL doğrulanmadı.** Evde önce 5 kontrolü çalıştır.
 
 > **ADIM 0 TAMAMLANDI.** **ADIM 1 TAMAMLANDI** (1.1–1.8).
 > **Adım A–E (dlt/dbt) hiç başlanmadı ve iptal edildi** (ADR-0009).
-> **Bu oturumda plan yeniden yazıldı, kod yazılmadı.** `src/` hâlâ 0 satır.
+> **İLK PYTHON KODU YAZILDI** — `src/lastfm_etl/config.py`, 63 satır. `src/` artık 0 değil.
 
-### Sıradaki oturumda ilk iş (iş makinesi)
+### Bu oturumda (2026-08-17, iş makinesi) yapılanlar
+
+| Ne | Durum |
+|---|---|
+| `uv add python-dotenv` | `pyproject.toml` `dependencies` doldu, `uv.lock` gerçek içerik kazandı |
+| `src/lastfm_etl/config.py` | Yazıldı — `Config` (frozen dataclass) + `ConfigError` + `load_config()` |
+| `docs/notes/18-config-secrets-and-fail-fast.md` | Yazıldı (15 bölüm) |
+| `docs/notes/README.md` | Index'e 18 eklendi |
+| KONTROL 1–5 | **Çalıştırılmadı.** Evde ilk iş |
+
+**`config.py`'de verilen kararlar** (gerekçeleri not 18'de):
+
+| Karar | Sebep |
+|---|---|
+| `@dataclass(frozen=True, slots=True, repr=False)` | Immutable + typo koruması + otomatik repr'in sır sızdırmasını engelleme |
+| Elle maskeli `__repr__` | Sır en sık traceback/log üzerinden sızar, `print(config)`'ten değil |
+| `__post_init__` + `fields(self)` gezme | Tipin değişmezi; arka durak. Yeni alan otomatik kapsanır |
+| `load_config()` içinde okuma (sınıf gövdesinde değil) | Sınıf seviyesi varsayılan import anında donar → test edilemez |
+| `@lru_cache(maxsize=1)` | Tek okuma, tutarlı nesne. **Testte `load_config.cache_clear()` gerekecek** |
+| `logging.getLogger(__name__)`, `basicConfig` yok | Kütüphane logger *alır*, uygulama logging'i *kurar*. `setup_logging()` P2.1'de |
+| `logger.debug("... %s", x)` (f-string değil) | Lazy formatlama + log gruplama (`ruff G004`) |
+| Hata loglanmıyor, fırlatılıyor | `load_config()` çalışırken logging henüz kurulmamıştır |
+
+### Evde ilk iş (ev makinesi)
 
 1. `git pull`
-2. `ROADMAP.md` → **"Öğrenilecek structure"** tablosu (dokuz satır) + **Adım P1**.
-   `A.x` alt adımlarını arama, yoklar.
-3. `.env` içinde `LASTFM_API_KEY` dolu mu — kontrol et. (Ev makinesinde 0 byte.)
-4. Sohbete **aşağıdaki soruyu cevaplayarak** başla. P1.1 tam orada duruyor.
+2. **`.env` kontrolü:** ev makinesinde `LASTFM_API_KEY` **0 byte'tı**. İş makinesinde 32
+   karakter. `.env` git'e girmediği için ev makinesine **gelmeyecek** — key'i elle
+   doldur, yoksa KONTROL 1 patlar (ki bu doğru davranıştır).
+3. Aşağıdaki 5 kontrolü sırayla çalıştır.
 
-**P1.1 — cevaplanacak soru (sohbet burada kaldı):**
+**P1.1 — KONTROL komutları (Git Bash):**
 
-> Kurs `client_id = "your_client_id"` yazıyor. Bunun yanlış olduğu açık.
-> Elde zaten `.env` (gerçek key) ve `.env.example` (sözleşme) var. Şimdi bir
-> **üçüncü** dosya yazılacak: `src/lastfm_etl/config.py`.
->
-> **(a)** İhtiyaç duyulan yerde doğrudan `os.environ["LASTFM_API_KEY"]` yazsak ne
-> kaybederiz? Ayrı bir config modülü tam olarak hangi problemi çözüyor?
->
-> **(b)** `.env` de diskte duran düz metin bir dosya. Key'i koda gömmekle `.env`'e
-> koymak arasında gerçekte ne değişiyor? "Daha güvenli" yetmez — neyin, kime karşı?
+```bash
+# 1 — mutlu yol + maskeleme → beklenen: Config(lastfm_api_key='***XXXX')
+uv run python -c "from lastfm_etl.config import load_config; print(load_config())"
 
-Cevap verilince sıra: NASIL → SEN YAZ (`config.py`) → KONTROL.
+# 2 — fail-fast + exit code → beklenen: ConfigError ve echo $? = 1
+LASTFM_API_KEY= uv run python -c "from lastfm_etl.config import load_config; load_config()"
+echo $?
+
+# 3 — __post_init__ arka durağı → beklenen: ConfigError: Config fields must not be empty
+uv run python -c "from lastfm_etl.config import Config; Config(lastfm_api_key='   ')"
+
+# 4 — logger: kurulumsuz sessiz, kurulunca iki DEBUG satırı (config maskeli)
+uv run python -c "
+import logging; logging.basicConfig(level=logging.DEBUG)
+from lastfm_etl.config import load_config; load_config()
+"
+
+# 5 — sır git'e sızmıyor → .env listede OLMAMALI
+git status --short
+```
+
+> PowerShell kullanıyorsan KONTROL 2 farklı: `$env:X=""` değişkeni **siler**, boş
+> bırakmaz. Onun yerine `.env`'i geçici olarak `.env.bak` yap, komutu çalıştır, geri al.
+> Exit code'u `$LASTEXITCODE` ile oku.
+
+**Beşi de geçtiğinde P1.1 kapanır.** Kapanış işleri (sırayla):
+
+1. `.env.example`'daki Türkçe yorumları İngilizce'ye çevir + "2.5'teki fail-fast"
+   ifadesini düzelt (aşağıda açık iş 1)
+2. `requires-python` kararı (açık iş 2 + aşağıdaki Python 3.14 uyarısı)
+3. Commit → `PROGRESS.md` güncelle → **P1.2'ye geç** (AWS IAM kullanıcı + budget alarm)
+
+### Yeni açık konu: Python 3.14 ↔ Lambda runtime uyumu
+
+`.venv` **Python 3.14** ile kurulmuş (`__pycache__` dosyaları `cpython-314`). AWS
+Lambda'nın desteklediği en yeni runtime bundan geride. Şu an bir şey kırmıyor çünkü
+`python-dotenv` saf Python. **P2'de `pandas` ve `pyarrow` girdiğinde kıracak:** bu
+kütüphanelerin derlenmiş wheel'leri Python sürümüne bağlıdır ve 3.14 için kurulan bir
+Lambda layer'ı 3.13 runtime'ında `ImportError` verir.
+
+→ **P3.1'e girmeden önce** venv'i Lambda runtime'ıyla aynı sürüme çekmek gerekecek
+(`uv python pin`). Karar P1.1 kapanışında `requires-python` ile birlikte verilecek.
 
 **Açık işler:**
 
@@ -53,8 +107,8 @@ Cevap verilince sıra: NASIL → SEN YAZ (`config.py`) → KONTROL.
 | 6 | ADR-0009 başlığı (`Retire dlt and dbt` önerisi) | **Kapatıldı.** Olduğu gibi kalıyor; başlık tartışması kapsam şişmesidir |
 | 7 | `PROGRESS.md` "Tamamlananlar" geçmişi | Budanmadı, **budanmayacak.** 9 günün kanıtı orada |
 
-**Kurulu olmayanlar:** `requests`, `pandas`, `pyarrow`, `boto3` henüz bağımlılık olarak
-eklenmedi. P1.1 sadece config okumayı gerektirir; geri kalanı P2'de gelir.
+**Kurulu olanlar:** `python-dotenv` (P1.1'de eklendi).
+**Kurulu olmayanlar:** `requests`, `pandas`, `pyarrow`, `boto3` — hepsi P2'de gelir.
 
 ---
 
