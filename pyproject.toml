@@ -7,7 +7,9 @@ name = "lastfm-etl"
 version = "0.1.0"
 description = "ETL pipeline for Last.fm listening history"
 requires-python = ">=3.11"
-dependencies = []
+dependencies = [
+    "python-dotenv>=1.2.3",
+]
 
 [tool.setuptools.packages.find]
 where = ["src"]
