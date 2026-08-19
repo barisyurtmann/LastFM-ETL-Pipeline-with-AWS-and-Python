@@ -8,6 +8,14 @@ neden o sırayla — ve `uv` olmayan bir makinede aynı işin nasıl yapıldığ
 
 İkisini birlikte oku. 08 "neden", 09 "nasıl".
 
+> **Kısa cevap** — Hangi uv komutu, hangi sırayla ve uv olmayan makinede karşılığı nedir?
+>
+> 1. `uv sync` deklaratiftir ve lock'ta olmayan paketi siler; `pip install -r` hiçbir zaman silmez, ortam komut geçmişinin birikimidir.
+> 2. `uv pip install` pip uyumluluk katmanıdır ve `uv.lock`'a hiç bakmaz; project mode'da `uv add` kullanılır, lock aynı commit'e girer.
+> 3. CI'da `uv sync --frozen` + `uv` sürümünü sabitleme şart; aksi hâlde sapma sessizce tamir edilir veya build kendiliğinden kırılır.
+>
+> Bu üçü yeterliyse aşağısını okumana gerek yok.
+
 ---
 
 ## 1. Zihinsel model: emir kipi vs bildirim kipi

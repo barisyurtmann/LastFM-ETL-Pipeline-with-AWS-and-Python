@@ -11,6 +11,36 @@ Testi tek soru: **"Bu bilgi başka bir projede de geçerli mi?"**
 | Evet — genel bilgi (`.gitignore` syntax'ı, commit mesajı formatı) | `notes/` |
 | Hayır — bu projeye özel karar (neden Parquet, neden bu partition şeması) | `adr/` |
 
+## Not şablonu — 20'den sonraki her not
+
+Her not **en fazla ~60 satır** ve hep aynı dört bölüm:
+
+```markdown
+# 20 — Başlık
+
+> **Kısa cevap** — <notun cevapladığı soru>
+>
+> 1. <en kritik sonuç>
+> 2. <ikinci>
+> 3. <üçüncü>
+
+## Neden
+<max 10 satır. Bu bilinmezse ne kırılır.>
+
+## Nasıl
+<komut veya kod, gerektiği kadar>
+
+## Kanıt
+<çalıştırılıp doğrulanacak komut ve beklenen çıktı>
+```
+
+Sınır bir kalite kuralı değil, bir **öncelik zorlayıcısıdır**: sınır yokken her şey içeri
+girer ve 400 satırlık bir not bir daha hiç açılmaz. Konu 60 satıra sığmıyorsa ya ikiye
+bölünür ya da satır satır anlatım [`docs/annotated/`](../annotated/README.md)'a gider.
+
+**01–19 arası notlar bu şablondan önce yazıldı.** Onlar budanmadı; her birinin başına
+aynı "Kısa cevap" bloğu eklendi. Blok yetiyorsa gerisini okumana gerek yok.
+
 ## İçindekiler
 
 | # | Konu | Adım |
@@ -33,6 +63,13 @@ Testi tek soru: **"Bu bilgi başka bir projede de geçerli mi?"**
 | [16](16-shell-loops-and-measurement.md) | Shell'de döngü (`for`/`while`, form seçimi, PowerShell), `curl -w` ile ölçüm, gecikme istatistikleri, ölçüm araçları | 1.8 |
 | [17](17-rate-limits-discovery-and-backoff.md) | Rate limit: dört aşamalı keşif protokolü (bash), header standartları, limit algoritmaları, üstel backoff + jitter, retry taksonomisi | 1.8 |
 | [18](18-config-secrets-and-fail-fast.md) | Config vs sabit ayrımı, `.env` tehdit modeli, fail-fast, maskeli `__repr__`, `dataclass` vs `pydantic-settings`, `python-dotenv` öncelik sırası | P1.1 |
+| [19](19-python-language-tools-in-config-py.md) | Python dil araçları: hızlı referans tablosu, iddiaları doğrulayan kanıt komutları, yanlış anlaşılan noktalar. Satır satır anlatım için → `docs/annotated/` | P1.1 |
+
+## Kodun yorumlu aynası
+
+`src/` altındaki her `.py` dosyasının satır satır Türkçe yorumlanmış kopyası ayrı bir
+klasörde durur: [`docs/annotated/`](../annotated/README.md). Bir **satırın** ne yaptığını
+öğrenmek istiyorsan oraya bak; bir **konuyu** öğrenmek istiyorsan buraya.
 
 ---
 

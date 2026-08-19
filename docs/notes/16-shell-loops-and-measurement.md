@@ -15,6 +15,14 @@
 **İlgili:** döngü dışı shell temelleri → [not 12](12-shell-basics.md) ·
 `curl` bayrak kataloğu → [not 11 §5](11-manual-api-calls-and-auth-models.md)
 
+> **Kısa cevap** — Shell'den tekrarlı iş nasıl yapılır ve bir gecikme dürüstçe nasıl ölçülür?
+>
+> 1. `{1..$N}` çalışmaz: brace expansion, değişken genişletmesinden önceki geçişte biter.
+> 2. curl döngüsü her turda TCP+TLS'i yeniden öder; Python istemciden istek başına 50-150 ms yüksek ölçer.
+> 3. Dış API'ye istek atan döngüde üst sınır garanti, koşul sadece fırsattır; 20 örnekle p95 istatistik değil gürültüdür.
+>
+> Bu üçü yeterliyse aşağısını okumana gerek yok.
+
 ---
 
 ## 1. Döngü formları

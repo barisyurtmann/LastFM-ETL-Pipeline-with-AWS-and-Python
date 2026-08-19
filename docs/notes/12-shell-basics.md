@@ -9,6 +9,14 @@ Veri mühendisliğinde shell kaçınılmaz: CI pipeline'ları, Dockerfile'lar, c
 Makefile'lar — hepsi shell komutudur. Python bilip shell bilmemek, sürekli takılınan
 bir noktadır.
 
+> **Kısa cevap** — Bir komut satırındaki her sembol ne iş yapıyor ve nerede sessizce kırılır?
+>
+> 1. Exit code 0 başarıdır; cron, CI ve Airflow log'daki "ERROR" kelimesini değil yalnızca bu sayıyı okur.
+> 2. `source` olmadan .env yüklenmez; yüklense de sadece shell değişkeni olur, Python alt süreci göremez — `set -a` şart.
+> 3. `source .env` dosyayı bash script olarak çalıştırır (`$(...)` dahil); pydantic-settings parse eder, çalıştırmaz.
+>
+> Bu üçü yeterliyse aşağısını okumana gerek yok.
+
 ---
 
 ## 1. Hangi shell'i kullanıyorum

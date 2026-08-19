@@ -7,6 +7,14 @@
 >
 > Örnekler Last.fm'den, çünkü ölçülmüş gerçek veri. Kurallar kaynaktan bağımsız.
 
+> **Kısa cevap** — Payload'daki hangi alan curated tabloya girer, hangisi hangi gerekçeyle elenir?
+>
+> 1. "Zaten türetilebilir" bir hipotezdir: track.url 39 kaydın 35'inde tuttu, kalan %10'da sessiz kırık link olurdu.
+> 2. mbid boş değil eksik — anahtar dict'te hiç yok; `.get(k, "")` kaynağın hiç göndermediği değeri uydurur.
+> 3. rank her sayfa kendi page/perPage'iyle hesaplanır; global enumerate son sayfa 19 kayıt dönünce tüm sırayı kaydırır.
+>
+> Bu üçü yeterliyse aşağısını okumana gerek yok.
+
 ---
 
 ## 0. Şemaya başlamadan önce: raw katman ≠ curated katman

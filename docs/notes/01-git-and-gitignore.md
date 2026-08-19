@@ -3,6 +3,14 @@
 > Adım 0.1 · 2026-08-07 — inline yorum tuzağı ve `check-ignore` bölümü 0.4'te eklendi,
 > negation/`-v` tuzağı 0.5'te eklendi (2026-08-10)
 
+> **Kısa cevap** — .gitignore neden sessizce çalışmaz ve yazdığını nasıl kanıtlarsın?
+>
+> 1. .gitignore inline yorum desteklemez; `__pycache__/  # cache` satırının tamamı pattern olur, hiçbir şey eşleşmez.
+> 2. `check-ignore -v` exit 0'ı "ignore'lu" değil "bir pattern ile eşleşti" demektir — `!` negation da eşleşme sayılır.
+> 3. Ignore'lu klasörün içi `!` ile kurtarılamaz; git klasöre hiç girmez, `/data/**` yazman gerekir.
+>
+> Bu üçü yeterliyse aşağısını okumana gerek yok.
+
 ## Neden `.gitignore` ilk iş olarak yazılır
 
 Yaygın olarak anlatılan gerekçe **yanlıştır**: "`.gitignore` commit'lenmeden koruma

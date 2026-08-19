@@ -26,6 +26,14 @@ git; kavramları hatırlaman gerekirse §1–7'ye dön.
 | [11](#11-grain-cümlesi-nasıl-test-edilir) | Grain cümlesi nasıl test edilir |
 | [12](#12-grain-yanlışsa-maliyeti--ve-neden-geri-dönüş-asimetriktir) | Grain yanlışsa maliyeti, geri dönüş asimetrisi |
 
+> **Kısa cevap** — Bir satırın neyi temsil ettiğine kod yazmadan önce nasıl karar verilir?
+>
+> 1. Grain sonradan inceltilir, kalınlaştırılamaz; atılan gözlem geri gelmez, bu yüzden şüphede daha ince seçilir.
+> 2. Anahtara alan eklemek onu güçlendirmez, grain'i inceltir ve çiftlenme riskini artırır.
+> 3. `city_id` anahtar oldu, `mbid` elendi: fark, ID'yi kaynağın kendisi mi yoksa üçüncü taraf mı üretiyor.
+>
+> Bu üçü yeterliyse aşağısını okumana gerek yok.
+
 ---
 
 ## 1. Grain nedir

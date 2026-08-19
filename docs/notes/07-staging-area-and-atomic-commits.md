@@ -5,6 +5,14 @@
 Not 02 commit **mesajını** anlatıyor. Bu not commit'in **kapsamını** anlatıyor:
 diskte beş dosya değiştiyse, bunlardan sadece ikisini nasıl commit'lersin ve neden?
 
+> **Kısa cevap** — Diskte beş dosya değiştiyse commit'in kapsamını nasıl seçersin?
+>
+> 1. `git commit` diskin değil index'in fotoğrafını çeker; `git diff` disk↔index, `git diff --staged` index↔HEAD gösterir.
+> 2. `git add` içeriği o anda dondurur: add sonrası düzenleme commit'e girmez, `git status` dosyayı hem staged hem unstaged listeler.
+> 3. `git commit -am` untracked dosyaları almaz; commit mesajını "ve" olmadan yazamıyorsan iki commit olmalıydı.
+>
+> Bu üçü yeterliyse aşağısını okumana gerek yok.
+
 ## Git'in üç bölgesi
 
 ```

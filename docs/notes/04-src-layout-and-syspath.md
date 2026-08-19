@@ -1,5 +1,13 @@
 # `src/` Layout ve `sys.path`
 
+> **Kısa cevap** — src/ klasörü estetik bir tercih mi, yoksa sys.path davranışını mı değiştiriyor?
+>
+> 1. src/ bir paket değil duvardır; sys.path'e hiç girmez, `__init__.py` içermez, kurulan ad `lastfm_etl`'dir.
+> 2. Flat layout'ta testler kaynak ağacından import eder; test edilen artifact ile dağıtılan wheel ayrı nesnedir.
+> 3. Repo kökü sys.path'te olduğu için köke konan `logging.py` stdlib'i gölgeler — hata mesajı stdlib'i suçlar.
+>
+> Bu üçü yeterliyse aşağısını okumana gerek yok.
+
 ## Soru
 
 Kodu neden `src/` klasörünün içine koyuyoruz? Repo kökünde `lastfm_etl/` olsa ne

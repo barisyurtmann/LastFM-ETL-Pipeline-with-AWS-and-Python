@@ -8,6 +8,14 @@
 >
 > Örnekler **bash**. Hepsi çalıştırılabilir, kopyala-yapıştır değil kopyala-oku-çalıştır.
 
+> **Kısa cevap** — Bir API'nin rate limit'i nasıl bulunur ve takılınca nasıl davranılır?
+>
+> 1. Throttle ve retry ayrı mekanizmadır; tek başına retry sistemin normal modunu "hata al, bekle" yapar.
+> 2. `Retry-After` gerçek RFC 9110 standardı, `X-RateLimit-Reset` de facto: epoch mu kalan saniye mi API'ye göre değişir.
+> 3. Sabit `sleep` hedef aralığa eklenir ve gerçek hızı düşürür; doğrusu geçen süreyi düşüp kalanı uyumaktır.
+>
+> Bu üçü yeterliyse aşağısını okumana gerek yok.
+
 ---
 
 ## 1. Rate limit bir hata değil, bir sözleşme

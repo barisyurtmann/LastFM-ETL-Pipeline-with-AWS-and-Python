@@ -8,6 +8,14 @@ Last.fm yalnızca örnek.
 
 Amaç: "veriye baktım, tamam görünüyor" cümlesini yasaklamak. Bakmak ölçmek değildir.
 
+> **Kısa cevap** — Bir veri kaynağına bakmakla onu ölçmek arasındaki fark nedir?
+>
+> 1. page=1'de 0 boş mbid, page=500'de %21 — ilk sayfa popülerlik sıralı olduğu için en iyi kürate edilmiş kayıtlardır.
+> 2. image alanında 80 URL beklenirken 4 benzersiz URL çıktı: dolu görünen boş veriyi sadece cardinality yakalar.
+> 3. total=10000 ve totalPages=500 tam çarpım, son sayfa 19 kayıt döndü — total bir sayım değil tavan.
+>
+> Bu üçü yeterliyse aşağısını okumana gerek yok.
+
 ---
 
 ## Neden bir protokol gerekiyor

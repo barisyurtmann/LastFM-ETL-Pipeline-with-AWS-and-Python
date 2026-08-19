@@ -6,6 +6,14 @@ Kod yazmadan önce API'yi elle çağırmak, her ciddi entegrasyonun ilk adımıd
 üç şeyi toplar: **neden** elle çağrılır, sırrı **komut satırına sokmadan** nasıl çağrılır,
 ve karşına çıkacak **auth modellerinin her birinde** bunun nasıl yapıldığı.
 
+> **Kısa cevap** — Kod yazmadan önce API'yi curl ile elle çağırmak neden zorunlu bir adım?
+>
+> 1. Last.fm hatada 200 dönmüyor: bozuk key 403, bozuk method 400 — "200 döner" genellemesi dokümandan geldi, ölçümden değil.
+> 2. `raise_for_status()` fırladığı anda gövde okunmaz; teşhis bilgisi (error 10 mu 26 mı) cevabın içinde ölür.
+> 3. `format=json` yoksa XML de 200 döner; status format hakkında hiçbir şey söylemez, JSONDecodeError "char 0" der.
+>
+> Bu üçü yeterliyse aşağısını okumana gerek yok.
+
 ---
 
 ## 1. Neden elle çağırmalı

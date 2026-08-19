@@ -11,13 +11,54 @@ Kural: bu dosya yalan söyleyebilir (güncellemeyi unutursan). `git log --onelin
 
 ---
 
-**Last updated:** 2026-08-17 (iş makinesi, akşam)
+**Last updated:** 2026-08-19
 **Current step:** P1 — Kurulum ve hesaplar ([plan](ROADMAP.md#adım-p1--kurulum-ve-hesaplar))
-**Next sub-step:** **P1.1 — kod yazıldı, KONTROL doğrulanmadı.** Evde önce 5 kontrolü çalıştır.
+**Next sub-step:** **P1.1 — kod yazıldı, KONTROL hâlâ doğrulanmadı.** İlk iş 5 kontrol.
 
 > **ADIM 0 TAMAMLANDI.** **ADIM 1 TAMAMLANDI** (1.1–1.8).
 > **Adım A–E (dlt/dbt) hiç başlanmadı ve iptal edildi** (ADR-0009).
 > **İLK PYTHON KODU YAZILDI** — `src/lastfm_etl/config.py`, 63 satır. `src/` artık 0 değil.
+
+### Bu oturumda (2026-08-19) yapılanlar — kod yok, doküman altyapısı
+
+**Yeni doküman kategorisi: `docs/annotated/`.** `src/` altındaki her `.py` dosyasının
+satır satır Türkçe yorumlanmış **aynası** burada durur. Yol `src/`'in birebir aynasıdır:
+`docs/annotated/src/lastfm_etl/config.py` ↔ `src/lastfm_etl/config.py`.
+
+Gerekçe: düz metin not (18, 19) kodu okurken açıklamayı **başka dosyada** aratıyor.
+Açıklamanın kodun yanında olması gerekiyor, ama kodun içinde olamaz — repo portfolyo,
+kod İngilizce ve kodun içindeki yorum "neden"i anlatır, "ne yaptığını" değil.
+
+**Kopya sapması nasıl çözüldü:** aynada `#:` ile başlayan her satır açıklamadır ve
+gerçek dosyada yoktur; kalan her karakter birebir aynıdır. Sapma makineyle ölçülür:
+
+```bash
+grep -v "^[[:space:]]*#:" docs/annotated/src/lastfm_etl/config.py | diff - src/lastfm_etl/config.py
+```
+
+Çıktı boşsa ayna güncel. Kural: **ayna, kaynağıyla aynı commit'te güncellenir.**
+Bundan sonra yazılacak her `.py` için aynası da yazılacak.
+
+| Ne | Durum |
+|---|---|
+| `docs/annotated/README.md` | Klasörün kuralı, `#:` sözleşmesi, sapma kontrolü, borçlar |
+| `docs/annotated/src/lastfm_etl/config.py` | 107 satır; `config.py`'nin 63 satırı + kod bloğu başına max 3 satır yorum |
+| `docs/notes/19-...` | Yeniden yazıldı: satır satır anlatım aynaya taşındı, notta hızlı referans + 7 kanıt komutu + yanlış anlaşılan noktalar kaldı |
+| `docs/notes/README.md` | 19 eklendi + `annotated/` bölümü |
+| `src/lastfm_etl/config.py` | **Tek karakter değişti:** dosya sonuna newline (`ruff W292`) |
+
+**`__post_init__` zaten vardı.** Bu oturumda "eksik" sanıldı; 31. satırda duruyor ve
+`ee978af` commit'inde yazılmıştı. Ders not 19 §3'te.
+
+**`config.py`'ye başka hiçbir şey eklenmedi — bilinçli.** "Production config'lerinde
+olup burada olmayanlar" listesi ve her birinin **hangi adımda** geleceği aynanın
+sonundaki blokta yazılı (APP_ENV, LOG_LEVEL, timeout, AWS_REGION, secret store,
+pydantic-settings). Bugün eklemek, hiçbir kod dalının okumadığı alanlar üretirdi.
+
+**Ölçülen yan bulgu:** `git ls-files --eol` → `i/lf w/crlf`. `.gitattributes` yalnızca
+**checkout** anında satır sonu çevirir; Windows'ta editörle *yeni yaratılan* dosya
+worktree'de CRLF kalır, index'e LF girer. Zararsız ama 03 numaralı notun "w/lf" iddiası
+yeni dosyalar için geçerli değil.
 
 ### Bu oturumda (2026-08-17, iş makinesi) yapılanlar
 

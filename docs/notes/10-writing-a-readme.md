@@ -6,6 +6,14 @@ README, projenin **kapısıdır**. Kod kalitesi ne olursa olsun, çoğu insanın
 dosya budur. Bu not README'nin kime yazıldığını, hangi bölümlerden oluştuğunu, nasıl test
 edildiğini ve en sık yapılan hataları toplar.
 
+> **Kısa cevap** — README kime yazılır ve neden çoğu README yalan söyler?
+>
+> 1. Aspirational README en büyük hata: çalışmayan komut yazmak, projenin bitmemiş olmasından daha kötü bir sinyaldir.
+> 2. README kapıdır, `docs/` odalardır; aynı bilgiyi iki yerde tutmak kaçınılmaz sapma demektir, derinliğe link verilir.
+> 3. Doküman elle test edilir: `$` prompt işareti kopyalamayı bozar, /tmp'de yabancı gibi baştan denemek şarttır.
+>
+> Bu üçü yeterliyse aşağısını okumana gerek yok.
+
 ---
 
 ## 1. Neden bu kadar önemli

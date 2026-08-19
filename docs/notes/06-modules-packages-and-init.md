@@ -1,5 +1,13 @@
 # Modül, Paket, `__init__.py` ve İsimlendirme
 
+> **Kısa cevap** — Paket, modül ve `__init__.py` arasındaki ilişki nedir ve içine ne konmaz?
+>
+> 1. Dağıtım adı ile import adı ayrı isim alanı: `pip install scikit-learn` → `import sklearn`; import adında tire olamaz.
+> 2. `import lastfm-pipeline` ModuleNotFoundError değil SyntaxError verir; derleme anında patladığı için `try/except` yakalayamaz.
+> 3. `__init__.py`'de `settings = Settings()` yazmak `.env` yokken import'u patlatır; alt modül import'u tüm üst `__init__.py`'leri çalıştırır.
+>
+> Bu üçü yeterliyse aşağısını okumana gerek yok.
+
 ## Terimler — dört ayrı şey
 
 Python'da "paket" kelimesi dört farklı anlamda kullanılıyor ve karışıklığın kaynağı bu.

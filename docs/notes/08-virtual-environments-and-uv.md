@@ -8,6 +8,14 @@ Bu not üç soruyu cevaplıyor: sanal ortam **neyi** çözüyor, `pip install -e
 Bilinmeyen terimler için en sonda [sözlük](#sözlük) var. Metin içinde ilk geçtikleri
 yerde kısa parantezlerle de açıklandılar.
 
+> **Kısa cevap** — Sanal ortam neyi çözer, `-e` ne yapar, `uv` bu resmin neresinde?
+>
+> 1. `site-packages` bir paketin tek sürümünü tutar; ikinci kurulum birinciyi sessizce ezer, çakışma bile vermez.
+> 2. İzolasyon `activate`'te değil `pyvenv.cfg`'nin `include-system-site-packages = false` satırında; activate sadece `PATH` düzenler.
+> 3. `pyproject.toml`'a `==` yazmak transitive bağımlılıkları serbest bırakır; abstract aralık toml'da, concrete kapanış lock'ta durur.
+>
+> Bu üçü yeterliyse aşağısını okumana gerek yok.
+
 ---
 
 ## 1. Problem: tek bir ortak çöplük

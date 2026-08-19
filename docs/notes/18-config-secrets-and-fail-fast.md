@@ -3,6 +3,14 @@
 **Adım:** P1.1
 **Genel mi:** Evet — her Python projesinde aynı problem, aynı çözüm ailesi.
 
+> **Kısa cevap** — Config ve sırlar nereye konur, eksik değer ne zaman patlamalı?
+>
+> 1. Sır en sık dataclass'ın otomatik `__repr__`'i üzerinden traceback, log ve pytest diff'ine sızar; `repr=False` + maskeli repr şart.
+> 2. `.env`'in koruması `.gitignore`'dan gelir, şifreleme değildir; sızıntıda ilk refleks dosyayı silmek değil key'i rotate etmektir.
+> 3. `LASTFM_API_KEY=` KeyError vermez, boş string döner — kontrol "var mı" değil `if not value.strip()` olmalı.
+>
+> Bu üçü yeterliyse aşağısını okumana gerek yok.
+
 ---
 
 ## 1. Config nedir, sabit nedir

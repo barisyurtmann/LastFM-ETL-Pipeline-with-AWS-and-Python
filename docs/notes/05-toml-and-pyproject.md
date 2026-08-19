@@ -1,5 +1,13 @@
 # TOML ve `pyproject.toml`
 
+> **Kısa cevap** — Python paketleme neden YAML/setup.py değil de TOML ve pyproject.toml seçti?
+>
+> 1. YAML tip çıkarımı yapar ("Norway problem": `country: NO` → False); TOML yapmaz, string tırnak içindedir.
+> 2. setup.py çalıştırılabilir koddu — bağımlılığı öğrenmek için keyfi kod çalıştırmak gerekiyordu; PEP 518 bunu statikleştirdi.
+> 3. Sürümü hem pyproject hem `__init__.py`'de tutma; `importlib.metadata.version()` dağıtım adı alır, import adı değil.
+>
+> Bu üçü yeterliyse aşağısını okumana gerek yok.
+
 ## TOML nedir
 
 **TOML** = *Tom's Obvious, Minimal Language*. Tom Preston-Werner (GitHub kurucularından)

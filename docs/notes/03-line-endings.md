@@ -1,5 +1,13 @@
 # Satır Sonları (CRLF / LF) ve `.gitattributes`
 
+> **Kısa cevap** — CRLF/LF farkı diff'i neden şişirir ve .gitattributes bunu tam olarak nasıl çözer?
+>
+> 1. Eklenen ve silinen satır sayısı birebir eşitse (1127/1127) içerik değil satır sonu değişmiştir.
+> 2. Git varsayılanı "akıllı" değil "karışmaz"dır; kural yoksa CRLF'i olduğu gibi commit eder.
+> 3. `add --renormalize` sadece index'i düzeltir, disk CRLF kalır; `rm -r --cached . && reset --hard` gerekir.
+>
+> Bu üçü yeterliyse aşağısını okumana gerek yok.
+
 ## Problem nasıl ortaya çıktı
 
 İki makinede çalışıyorum (ev + iş). Bir oturum başında `git status` şunu gösterdi:

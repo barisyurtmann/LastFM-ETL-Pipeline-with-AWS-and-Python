@@ -2,6 +2,14 @@
 
 > Adım 0.2 · 2026-08-07
 
+> **Kısa cevap** — İlk commit'te ne olmalı ve commit mesajı hangi cümleyi tamamlamalı?
+>
+> 1. Root commit'in ebeveyni yok, `rebase --root` zahmetli — bu yüzden ilk commit sadece .gitignore olur.
+> 2. Subject emir kipinde yazılır: "Bu commit uygulandığında repo şunu yapacak: ___" cümlesini tamamlamalı.
+> 3. Subject "ne", body "neden" der; `chore: add .gitignore` body istemez, `fix: retry on 5xx only` ister.
+>
+> Bu üçü yeterliyse aşağısını okumana gerek yok.
+
 ## İlk commit'te ne olur
 
 Cevap: **sadece `.gitignore`.** Gerekçesi iki tane, ve ikisi de "koruma" ile ilgili değil.
