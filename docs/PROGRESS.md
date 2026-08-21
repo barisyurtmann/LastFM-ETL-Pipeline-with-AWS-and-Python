@@ -11,13 +11,136 @@ Kural: bu dosya yalan söyleyebilir (güncellemeyi unutursan). `git log --onelin
 
 ---
 
-**Last updated:** 2026-08-19
+**Last updated:** 2026-08-20
 **Current step:** P1 — Kurulum ve hesaplar ([plan](ROADMAP.md#adım-p1--kurulum-ve-hesaplar))
-**Next sub-step:** **P1.1 — kod yazıldı, KONTROL hâlâ doğrulanmadı.** İlk iş 5 kontrol.
+**Next sub-step:** **P1.2 — adım 5B'den devam** (AWS CLI kurulumu + `aws configure`).
+P1.1 KAPANDI. Konsol adımları 1–5A yapıldı, terminal tarafı yapılmadı.
 
 > **ADIM 0 TAMAMLANDI.** **ADIM 1 TAMAMLANDI** (1.1–1.8).
 > **Adım A–E (dlt/dbt) hiç başlanmadı ve iptal edildi** (ADR-0009).
 > **İLK PYTHON KODU YAZILDI** — `src/lastfm_etl/config.py`, 63 satır. `src/` artık 0 değil.
+
+### 2026-08-20 — OTURUM SONU: nerede kaldık, evde nereden devam
+
+**Devam noktası: P1.2, adım 5B.** Tarayıcı tarafı bitti (5A dahil), terminal tarafı
+başlamadı. Evde ilk iş `git pull`.
+
+**P1.2 kontrol listesi** — hangi adımın bittiğini işaretleyerek ilerle:
+
+| Adım | Nerede | İş | Durum |
+|---|---|---|---|
+| 1 | Tarayıcı | AWS hesabı | ✔ |
+| 2 | Tarayıcı | Root kullanıcıya MFA | ✔ |
+| 3 | Tarayıcı | Budget alarm, aylık 5 USD, e-posta uyarısı | ✔ |
+| 4 | Tarayıcı | IAM kullanıcı `lastfm-etl-dev` + `AdministratorAccess` + MFA | ✔ |
+| 5A | Tarayıcı | Access key üretildi (CLI use case) | ✔ |
+| **5B** | **Git Bash** | **`winget install --id Amazon.AWSCLI -e`, pencereyi kapat-aç** | **← buradan devam** |
+| 5C | Git Bash | `aws configure` → key, secret, `eu-central-1`, `json` |  |
+| 5D | Git Bash | `aws sts get-caller-identity` → Arn'de `user/lastfm-etl-dev` |  |
+| P1.3 | Tarayıcı | İki bucket, konsoldan tıklayarak |  |
+
+> **Secret access key yalnızca üretildiği ekranda görünür.** O sayfa kapandıysa
+> anahtar kaybolmuştur — IAM'den eskisini sil, yenisini üret. Panik yok, ücretsiz.
+
+**Bu oturumda verilen kararlar:**
+
+| Karar | Gerekçe |
+|---|---|
+| **Öğrenme konsoldan yapılacak**, CLI'dan değil | Barış'ın tercihi: S3/Lambda/CloudWatch/Glue/Athena arayüzünü görmek istiyor. Konsol ile CLI aynı API'ye gider, biri diğerini gizlemez |
+| CLI yine de kurulacak | Sebep öğrenme değil: `boto3` kimlik doğrulamak için `~/.aws/credentials` dosyasını okuyor ve o dosyayı `aws configure` yazıyor. P2.2'de kod S3'e bu sayede yazacak |
+| AWS CLI `winget` ile, `uv` ile değil | `uv` Python kütüphanesi kurar (`.venv` içine, projeye özel); `winget` Windows uygulaması kurar (sisteme). AWS CLI kodun bağımlılığı değil, elin aleti. Ayrıca CLI v2 PyPI'da yayınlanmıyor — `pip install awscli` eski v1'i kurar |
+| Bölge: **`eu-central-1`** (Frankfurt) | İstanbul'a en yakın, Lambda/Glue/Athena hepsi mevcut. Bucket oluşturulduktan sonra bölgesi **değişmez** |
+| Bucket adları: `lastfm-etl-raw-<ek>`, `lastfm-etl-transformed-<ek>` | S3 bucket adları küresel olarak benzersiz; sonek çakışmayı önlüyor |
+| İnsan kullanıcıya `AdministratorAccess` | Least privilege **makine kimliklerine** uygulanacak (Lambda rolleri, P3.4). Tek kişilik öğrenme hesabında insanı kısmak her adımda `AccessDenied` demek. Bu bir mühendislik tercihi, yayınlanmış bir standart değil |
+| Bucket'larda versioning **açık** | S3'te silme geri alınamaz; versioning açıkken silinen nesne "delete marker" alır, orijinali durur |
+
+**Bekleyen doküman borcu:** bucket'lar oluşturulduktan sonra **ADR-0011 — bölge seçimi**
+yazılacak. Gerekçe: bucket'ın bölgesi sonradan değişmiyor, veriyi taşımak gerçek iş —
+yani geri alması pahalı bir karar, ADR tanımına giriyor. Şimdi yazılmıyor çünkü karar
+henüz uygulanmadı.
+
+### 2026-08-20 — P1.1 KAPANDI: config.py ölçüldü, beş kontrol de geçti
+
+`src/lastfm_etl.config` ilk kez çalıştırıldı (Python 3.14.3, Git Bash, ev makinesi).
+
+| # | Ölçülen | Sonuç |
+|---|---|---|
+| 1 | `print(load_config())` | `Config(lastfm_api_key='***f29d')` — `.env` okundu, repr maskeli |
+| 2 | `LASTFM_API_KEY=` ile çağrı | `ConfigError: Missing or empty environment variables: LASTFM_API_KEY...`, `echo $?` → **1** |
+| 3 | `Config(lastfm_api_key='   ')` | `ConfigError: Config fields must not be empty: lastfm_api_key` — `__post_init__` arka durağı çalışıyor |
+| 4 | `basicConfig(DEBUG)` + `load_config()` | İki DEBUG satırı; ikincisi maskeli config |
+| 5 | `git status --short` | `.env` **listede yok** |
+
+KONTROL 2 önemli bir şeyi kanıtladı: `.env` diskte dolu olduğu hâlde hata alındı. Sebep
+`load_dotenv(override=False)` — gerçek ortam değişkeni dosyayı yener. Üretimde (.env'in
+olmadığı Lambda'da) doğru davranış budur ve artık ölçülmüş durumda.
+
+**P1.1 kapanış işleri (aynı commit):**
+
+| İş | Durum |
+|---|---|
+| `.env.example` Türkçe yorumlar → İngilizce | Yapıldı. "2.5'teki fail-fast" ifadesi "P1.1" olarak düzeltildi, dosya sonu newline eklendi |
+| `requires-python` çelişkisi | Çözüldü → `>=3.14,<3.15` |
+| `PROJECT_CONTEXT` §2 "Python 3.12+" | `3.14` olarak güncellendi |
+
+**Python 3.14 ↔ Lambda uyumu konusu KAPANDI.** AWS Lambda `python3.14` runtime'ını
+Kasım 2025'te yayınladı; `.venv`'in 3.14.3 olması artık bir risk değil, **hedefle
+eşleşme**. Üst sınır (`<3.15`) bilinçli: `pandas`/`pyarrow` gibi derlenmiş wheel'ler
+minor sürüme bağlıdır, 3.15'te kurulan bir layer 3.14 runtime'ında `ImportError` verir.
+(Ağustos 2026 itibarıyla Lambda'da Python 3.15 yalnızca public preview.)
+
+### 2026-08-20 — ÇALIŞMA MODU DEĞİŞTİ: hız modu
+
+Karar `PROJECT_CONTEXT.md` §1c'de. Özet:
+
+| Konu | Yeni kural |
+|---|---|
+| `src/` altını kim yazar | **Claude yazar, Barış review eder ve çalıştırır** |
+| Tahmin soruları | **Sorulmaz.** Doğrudan anlatılır |
+| Rota | ROADMAP sırası **bozulmuyor**: P1.1 → P1.2 → P1.3 → P2 |
+| Değişmeyen | Kodu Barış çalıştırır, commit'i Barış atar, her `.py` aynasıyla birlikte gelir |
+
+Sebep: 35+ commit, ~10.000 satır doküman, 63 satır kod — ve o kod hiç çalıştırılmadı.
+Doküman kalitesi sorun değildi; darboğaz yazma hızı ve mesaj başına ilerlemeydi.
+
+**Claude projesinin instructions alanı da elle güncellenmeli** — repo dosyası Claude'un
+davranışını değiştirmez, yeni oturum eski kurala döner.
+
+### Bu oturumda (2026-08-20, ev) yapılanlar — kod yok, ayna yeniden yazıldı
+
+**Sorun:** ayna okunduğu hâlde anlaşılmıyordu. Sebep teşhis edildi: "kod bloğu başına
+en fazla 3 satır yorum" bütçesi yalnızca **neden**e yer bırakıyor, **ne olduğu**na
+bırakmıyordu. `Final çalışma zamanında kilitlemez, mypy'ye söyler` cümlesi; type hint,
+type checker, mypy ve çalışma zamanı kavramlarının bilindiğini varsayıyor. Bilinmiyorsa
+cümle bilgi taşımıyor. Aynı hata not 19'da da vardı: o bir **hatırlatma tablosu**,
+öğrenme metni değil — ama ilk öğrenme için kullanılıyordu.
+
+**Bilinmeyenler ölçüldü** (25 maddelik listeden işaretlenenler): `Final`/köşeli parantezli
+tipler, mypy, `@dataclass`ın ürettiği kod, `frozen`/`slots`/`repr`, class-instance-`self`,
+dunder metotlar, kalıtım, `raise`/exception, docstring, `getattr`, `fields()`, ortam
+değişkeni, logging, `.strip()`/`join()`, modül seviyesi kod ve import anı.
+**Bilinenler:** type hint sözdizimi, tuple/list, decorator, comprehension'lar, f-string,
+`%s` logging, slicing, truthy/falsy, `__name__`.
+
+| Ne | Durum |
+|---|---|
+| `docs/annotated/src/lastfm_etl/config.py` | **Yeniden yazıldı: 107 → ~550 satır.** Satır bütçesi kaldırıldı |
+| — yeni **Bölüm 0** | Aşağıdaki her şeyin ön koşulu olan 6 kavram (modül/import anı, class-instance-`self`, dunder, kalıtım, exception/`raise`, docstring) dosyanın başında, satır aralarına serpiştirilmeden |
+| — yeni yazım sözleşmesi | Her açıklama **NE → KANIT → BİZDE** sırasını izler; her iddianın çalıştırılabilir bir kanıt komutu var |
+| `docs/annotated/README.md` | Yeni sözleşme yazıldı; `notes/` ile sınır değişti: eskiden "özel bilgi / genel bilgi", artık **öğretme / hatırlatma**. Çelişkide **ayna kaynaktır** |
+| `docs/notes/19-...` | KONTROL C düzeltildi + iki "önce şöyle sandım" maddesi eklendi + başına "bu not öğretmez, hatırlatır" uyarısı |
+| `src/lastfm_etl/config.py` | **Dokunulmadı.** Sapma kontrolü temiz |
+
+**İki ölçüm, iki yanlış doküman iddiası düzeltildi** (hem Python 3.11 hem 3.14'te koşuldu):
+
+| İddia | Gerçek |
+|---|---|
+| `slots` typo'da `AttributeError` verir | `frozen` + `slots` birlikteyken **`TypeError`**. Sebep: `frozen`ın ürettiği `__setattr__` kapanışta slots'suz eski sınıfı tutar, `type(self) is cls` yanlış çıkar. Yalnız `slots` olsaydı `AttributeError` olurdu |
+| `repr=False` olmasa üretilen repr elle yazılanı ezerdi | **Ezmez** — dataclass sınıfta tanımlı `__repr__`in üstüne yazmaz. `repr=False`'ın işi hata modunu güvenli yapmak: elle yazılan silinirse `<Config object at 0x...>` çıkar, anahtar değil |
+
+İkisi de "mantıken böyle olmalı" ile "çalıştırdım, şu çıktı" farkının örneği.
+
+**Sıradaki iş değişmedi:** P1.1'in 5 KONTROL komutu hâlâ çalıştırılmadı.
 
 ### Bu oturumda (2026-08-19) yapılanlar — kod yok, doküman altyapısı
 
@@ -125,7 +248,12 @@ git status --short
 2. `requires-python` kararı (açık iş 2 + aşağıdaki Python 3.14 uyarısı)
 3. Commit → `PROGRESS.md` güncelle → **P1.2'ye geç** (AWS IAM kullanıcı + budget alarm)
 
-### Yeni açık konu: Python 3.14 ↔ Lambda runtime uyumu
+### ~~Yeni açık konu: Python 3.14 ↔ Lambda runtime uyumu~~ — KAPANDI 2026-08-20
+
+> Aşağıdaki bölüm tarihsel kayıt olarak duruyor. Endişe geçersiz çıktı: Lambda
+> `python3.14` runtime'ını Kasım 2025'te yayınladı. Karar: `requires-python = ">=3.14,<3.15"`.
+
+
 
 `.venv` **Python 3.14** ile kurulmuş (`__pycache__` dosyaları `cpython-314`). AWS
 Lambda'nın desteklediği en yeni runtime bundan geride. Şu an bir şey kırmıyor çünkü
@@ -140,8 +268,8 @@ Lambda layer'ı 3.13 runtime'ında `ImportError` verir.
 
 | # | İş | Durum |
 |---|---|---|
-| 1 | `.env.example` içinde **Türkçe yorumlar** var | Kural ihlali (portfolyo repo'su İngilizce). Ayrıca "2.5'teki fail-fast" diyor — 2.5 diye adım kalmadı. → **P1.1 sonunda düzelt** |
-| 2 | `pyproject.toml` `requires-python = ">=3.11"` | `PROJECT_CONTEXT` §2 "3.12+" diyor. Biri yanlış. → **P1.1 sonunda karar ver** |
+| 1 | `.env.example` içinde **Türkçe yorumlar** var | **Kapatıldı** (2026-08-20). İngilizce'ye çevrildi, "2.5" → "P1.1", dosya sonu newline eklendi |
+| 2 | `pyproject.toml` `requires-python = ">=3.11"` | **Kapatıldı** (2026-08-20). `>=3.14,<3.15` — Lambda `python3.14` runtime'ı ile eşlendi |
 | 3 | `PROJECT_CONTEXT.md` mimari + araç düzeltmesi | **Yapıldı.** §4 kursun mimarisiyle eşlendi, §2 saf Python'a döndü |
 | 4 | Repo adı `LastFM-ETL-...` | **Değişmiyor.** Mimari yeniden ETL (ADR-0009); isim doğru |
 | 5 | Rate limit çelişkisi (`5/dakika` vs `5/saniye`) | **Düzeltildi.** Doğrusu **saniyede ~5**. `PROJECT_CONTEXT.md` §3 yanlıştı, not 17 doğruydu |

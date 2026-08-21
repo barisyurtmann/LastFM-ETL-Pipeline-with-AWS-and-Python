@@ -6,7 +6,10 @@ build-backend = "setuptools.build_meta"
 name = "lastfm-etl"
 version = "0.1.0"
 description = "ETL pipeline for Last.fm listening history"
-requires-python = ">=3.11"
+# Pinned to the minor version of the AWS Lambda python3.14 runtime. Compiled wheels
+# (pandas, pyarrow) are built per minor version, so a layer built on 3.15 would fail
+# to import on a 3.14 runtime. The upper bound is the deployment target, not a preference.
+requires-python = ">=3.14,<3.15"
 dependencies = [
     "python-dotenv>=1.2.3",
 ]
