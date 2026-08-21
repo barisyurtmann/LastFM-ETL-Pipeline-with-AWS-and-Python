@@ -93,6 +93,58 @@ anlatılırsa veya bir not koddan önce yazılmaya başlanırsa — durdurulur.
 
 ---
 
+## 1c. Çalışma anlaşması — 2026-08-20 revizyonu: hız modu
+
+> §1b teşhisi doğruydu ama tedavi yetmedi. 2026-08-20 itibarıyla: 35+ commit,
+> ~10.000 satır doküman, **63 satır** pipeline kodu ve o kod hâlâ bir kez
+> çalıştırılmamış. Barış'ın kendi ifadesi: *"çok geç kaldım, artık elimde çalışan
+> bir pipeline olsun."* Bu bir kapsam kararı değil, bir **öncelik** kararıdır.
+
+**Değişen iki kural:**
+
+| Eski | Yeni | Gerekçe |
+|---|---|---|
+| Claude `src/` altına dokunmaz; Barış yazar | **Claude yazar, Barış review eder ve çalıştırır** | Yazma hızı darboğazdı. Öğrenme `docs/annotated/` aynasından devam ediyor |
+| Bir şeyi açıklamadan önce Barış'a soru sorulur | **Tahmin sorusu sorulmaz.** Doğrudan anlatılır | Tahmin turu tur başına 1 mesaj ekliyordu ve ilerlemeyi bloke ediyordu |
+
+**Eklenen kural — terim borcu (2026-08-20):**
+
+> Claude bir terimi **ilk kez** kullandığında, aynı cümlede veya hemen ardından
+> tanımını verir. İstisna yok: "bucket", "shell", "runtime", "layer", "role",
+> "handler", "prefix" — hepsi tanımlanır.
+
+Tetikleyen olay: `bucket` ve `bash` terimleri, tanımlanmadan onlarca kez kullanıldı.
+Barış'ın ifadesi: *"hâlâ benim bucket'ın ne olduğunu bildiğimi varsayıyorsun."*
+
+Kuralın iki kenarı:
+
+- **Yeni dosya açılmaz.** Terimler sözlüğü diye ayrı bir not **yazılmayacak** —
+  bu proje zaten doküman fazlasından muzdarip. Tanım geçtiği yerde verilir;
+  kalıcı olması gerekiyorsa ilgili `docs/annotated/` aynasına veya mevcut bir nota girer.
+- **Tanım kısa olur.** Bir cümle + gerekiyorsa bir benzetme. Paragraf değil.
+
+**Değişmeyenler — bunlar hız modunda da geçerli:**
+
+- **Kodu Barış çalıştırır.** Claude'un yazdığı hiçbir dosya, Barış kendi makinesinde
+  çalıştırıp çıktısını görmeden "bitti" sayılmaz. Ölçülmemiş kod, yazılmamış koddur.
+- **Commit'i Barış atar.** Diff okunmadan commit atılmaz; review buradan yapılır.
+- **Her yeni `.py` dosyasının aynası aynı commit'te yazılır** (`docs/annotated/`).
+  Ayna artık ders kitabının kendisi — kod Claude'dan geliyorsa ayna daha da önemli.
+- **Tek seferde tek alt adım.** Hız, adım atlamak değil, adım başına mesaj sayısını
+  azaltmak demektir.
+- **Kapsam şişmesi yasağı.** "Şunu da ekleyelim" hâlâ durdurulur.
+
+**Rota kararı (aynı gün):** ROADMAP sırası **bozulmuyor**. P1.1 kapanır → P1.2 (IAM +
+budget alarm) → P1.3 (S3 bucket'lar) → P2 (extract/transform). "Önce local uçtan uca,
+AWS sonra" seçeneği değerlendirildi ve **reddedildi**; P2.2 raw'ı S3'e yazıyor,
+bucket'sız P2 yarım kalırdı.
+
+> **Not:** bu bölüm reponun kaydıdır. Claude'un davranışını asıl belirleyen metin
+> Claude projesinin **instructions** alanıdır; oradaki "src/'e dokunma" ve "önce soru
+> sor" maddeleri de elle güncellenmelidir, yoksa yeni oturum eski kurala döner.
+
+---
+
 ## 2. Teknik tercihler
 
 | Konu | Karar |
@@ -100,7 +152,7 @@ anlatılırsa veya bir not koddan önce yazılmaya başlanırsa — durdurulur.
 | Sohbet dili | Türkçe |
 | Kod / docstring / commit / README / ADR dili | İngilizce |
 | `docs/notes/` dili | Türkçe (öğrenme defteri) |
-| Python | 3.12+ |
+| Python | **3.14** (`>=3.14,<3.15`) — AWS Lambda `python3.14` runtime'ıyla eşlendi (2026-08-20). Derlenmiş wheel'ler minor sürüme bağlı olduğu için üst sınır bir tercih değil, deploy hedefi |
 | Paket yönetimi | `uv`, project mode (ADR-0003) |
 | HTTP | `requests` — elle yazılan client, retry ve backoff dahil |
 | Transform | `pandas` (düzleştirme, dedupe) + `pyarrow` (Parquet). **Framework yok** (ADR-0009) |
