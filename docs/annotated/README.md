@@ -33,6 +33,35 @@ kopya vardır. Yukarıdaki komut o ölçümdür.
 
 ---
 
+## Yazım sözleşmesi (2026-08-20'de değişti)
+
+**Eski kural — "kod bloğu başına en fazla 3 satır yorum" — kaldırıldı.**
+
+Gerekçe: 3 satıra yalnızca **neden** sığıyordu. `Final çalışma zamanında bir şeyi
+kilitlemez, yalnızca mypy'ye söyler` cümlesi, okuyanın *type hint*, *type checker*,
+*mypy* ve *çalışma zamanı* kavramlarını bildiğini varsayar. Bilmiyorsa cümle bilgi
+taşımaz, sadece kendine güvenli görünür. Bütçe, açıklamayı **hatırlatmaya** indirgiyordu.
+
+Yeni sözleşme — her açıklama bu üç soruyu bu sırayla cevaplar:
+
+| Katman | Soru |
+|---|---|
+| **NE** | Bu sözdizimi/nesne aslında nedir? Python bununla ne yapar? |
+| **KANIT** | İddiayı doğrulayan, kopyalanıp çalıştırılabilir komut |
+| **BİZDE** | Bizim kodda tam olarak neyi değiştiriyor? |
+
+Ek kurallar:
+
+- **Satır bütçesi yoktur.** Kavram anlaşılana kadar yazılır.
+- **Ön koşul kavramlar dosyanın başına.** `class`/`instance`, dunder metotlar, kalıtım
+  gibi *aşağıdaki her şeyin üzerine kurulduğu* konular satır aralarına serpiştirilmez;
+  dosyanın en üstünde numaralı bir **Bölüm 0** olarak durur. Sebep: bunlar tek bir satıra
+  ait değil, dosyanın tamamına aittir.
+- **Ölçülmemiş iddia yazılmaz.** "Şu hata tipini verir" diyorsan çalıştırıp görmüş
+  olacaksın. Ölçüm bir notu yalanlarsa **düzeltme aynaya yazılır ve not düzeltilir**.
+
+---
+
 ## Kurallar
 
 1. **Ayna, kaynağıyla aynı commit'te güncellenir.** Kod değişip ayna değişmediyse
@@ -50,21 +79,23 @@ kopya vardır. Yukarıdaki komut o ölçümdür.
 
 | Soru | Nerede |
 |---|---|
-| Bu **satır** ne yapıyor? | `docs/annotated/` — kodun yanında |
+| Bu satır ne yapıyor, kullandığı dil aracı **nedir** — ilk öğrenme | `docs/annotated/` |
+| Aynı konular altı ay sonra, **hatırlatma** tablosu + kanıt komutları | `docs/notes/19` |
 | Bu **tasarım** neden böyle? (fail-fast, sır sızıntısı, araç seçimi) | `docs/notes/18` |
-| Bu **sözdizimi** genel olarak nasıl çalışır? (hızlı referans, kanıt komutları) | `docs/notes/19` |
 | Bu **karar** neden geri alınamaz? | `docs/adr/` |
 
-Aynı bilgiyi iki yere yazmamak için: ayna dosyası **bu koda özel** olanı anlatır,
-`notes/` **başka projede de geçerli** olanı. Sınır bu.
+Sınır artık "özel bilgi / genel bilgi" değil — çünkü genel bilgiyi de kodun yanında
+öğrenmek gerekiyor. Yeni sınır **öğretme / hatırlatma**: ayna öğretir (uzun, örnekli),
+`notes/19` hatırlatır (tablo, tek cümle). Aynı konu iki yerde geçerse **ayna kaynaktır**,
+not ondan türetilir.
 
 ---
 
 ## İçindekiler
 
-| Ayna | Kaynak | Kapsadığı konular |
+| Ayna | Satır | Kapsadığı konular |
 |---|---|---|
-| [`src/lastfm_etl/config.py`](src/lastfm_etl/config.py) | `src/lastfm_etl/config.py` | modül docstring'i, PEP 8 import sırası, `getLogger(__name__)`, `Final`, `tuple[str, ...]`, `RuntimeError` kalıtımı, `dataclass(frozen/slots/repr)`, `__post_init__`, `fields()` + `getattr`, maskeli `__repr__`, `lru_cache`, `find_dotenv`/`override=False`, comprehension'lar, örtük string birleştirme, `%s` logging |
+| [`src/lastfm_etl/config.py`](src/lastfm_etl/config.py) | ~550 | **Bölüm 0:** modül/import anı, class-instance-`self`, dunder metotlar, kalıtım, exception ve `raise`, docstring. **Bölüm 1:** PEP 8 import sırası, logging (Logger/Handler/Level, `__name__`), type hint + `Final` + `tuple[str, ...]` + mypy, `RuntimeError` kalıtımı, `@dataclass`ın ürettiği kod, `frozen`/`slots`/`repr=False`, `__post_init__`, `fields()`, `getattr`, `.strip()`, `", ".join()`, maskeli `__repr__`, `lru_cache` sarmalayıcısı, ortam değişkeni nedir, `find_dotenv`/`override=False`, `%s` logging |
 
 ---
 
@@ -75,3 +106,5 @@ Aynı bilgiyi iki yere yazmamak için: ayna dosyası **bu koda özel** olanı an
 - **Sapma kontrolü şimdilik elle çalıştırılıyor.** P2.4'te `pytest` geldiğinde bu bir
   teste dönüşebilir: aynadan `#:` satırlarını sil, kaynakla karşılaştır, eşit değilse
   testi düşür. O zaman ayna bayatlarsa CI söyler, insan hafızası değil.
+- **Aynadaki kanıt komutları da bayatlayabilir.** Bugün hiçbiri otomatik çalışmıyor;
+  aynı `pytest` turunda bunların bir kısmı doctest'e dönüştürülebilir.

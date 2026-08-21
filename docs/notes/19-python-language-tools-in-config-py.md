@@ -4,6 +4,10 @@
 **Genel mi:** Evet — `dataclass`, `lru_cache`, `getattr`, comprehension, `__post_init__`
 her Python projesinde aynı şekilde çalışır.
 
+> **Bu not öğretmez, hatırlatır.** İlk kez öğreniyorsan buradan başlama — aynadaki
+> Bölüm 0 ve satır açıklamaları o iş için yazıldı. Bu dosya, konuyu bir kez anlamış
+> olanın altı ay sonra baktığı tablodur. Çelişki olursa **ayna kaynaktır.**
+>
 > **Satır satır anlatım burada değil.** `config.py`'nin yorumlanmış aynası:
 > [`docs/annotated/src/lastfm_etl/config.py`](../annotated/src/lastfm_etl/config.py)
 > Tasarım gerekçeleri (fail-fast, sır sızıntısı, araç seçimi):
@@ -30,8 +34,8 @@ doğrulayan komutlar, (3) yanlış anlaşılan noktalar.
 | `tuple[str, ...]` | Değişken uzunlukta, hepsi `str`. `...` = `Ellipsis`, "uzunluk serbest" |
 | `("a",)` | Tuple'ı **virgül** yapar, parantez değil. `("a")` sadece bir string'tir |
 | `@dataclass(frozen=True)` | Atama `FrozenInstanceError`; `eq=True` ile birlikte sınıf hashable olur |
-| `slots=True` | `__dict__` yok → yanlış alan adına atama `AttributeError` verir |
-| `repr=False` | Dataclass `__repr__` üretmesin; elle yazılan geçerli olsun |
+| `slots=True` | `__dict__` yok → yanlış alan adına atama hata verir. `frozen` ile birlikteyse hata `TypeError`, tek başınayken `AttributeError` (§3) |
+| `repr=False` | Dataclass `__repr__` üretmesin. Elle yazılmış bir `__repr__` zaten kazanır; bunun asıl işi, o metot silinirse sızıntısız bir varsayılana düşmek (§3) |
 | `__post_init__` | `__init__`'in **sonunda** otomatik çağrılır; doğrulamanın yeri |
 | `fields(obj)` | Alan **tanımlarını** döndürür (`.name`, `.type`), değerlerini değil |
 | `getattr(obj, "x")` | `obj.x` — ama özniteliğin adı çalışma zamanında string olduğunda |
@@ -55,7 +59,7 @@ uv run python -c "from lastfm_etl.config import load_config as l; print(l() is l
 # B — frozen gerçekten kilitliyor mu? beklenen: FrozenInstanceError
 uv run python -c "from lastfm_etl.config import load_config; c=load_config(); c.lastfm_api_key='x'"
 
-# C — slots typo'yu yakalıyor mu? beklenen: AttributeError ('lastfm_api_ky')
+# C — slots typo'yu yakalıyor mu? beklenen: TypeError — AttributeError DEĞİL (bkz. §3)
 uv run python -c "from lastfm_etl.config import load_config; load_config().lastfm_api_ky='x'"
 
 # D — Final çalışma zamanında koruyor mu? beklenen: HAYIR, sessizce değişir
@@ -89,6 +93,23 @@ type hint'ler için geçerli: `-> None` yazan bir fonksiyon `str` döndürebilir
 **Aslında:** 31. satırda duruyor ve `ee978af` commit'inde onu kendisi yazmıştı. Ders,
 Python'la ilgili değil: **dosyanın kendisine bakmadan eksik ilan etme.** `git log -1 --
 <dosya>` ve `grep -n "def "` iki saniyelik komutlar.
+
+**Barış önce şöyle sandı:** `slots=True` olan bir dataclass'ta olmayan bir alana atama
+`AttributeError` verir (bu notun ilk hâli KONTROL C'de bunu yazıyordu).
+**Aslında:** bizim sınıfımız `frozen=True` **ve** `slots=True`. İkisi birlikteyken hata
+`TypeError: super(type, obj)...` olur — hem 3.11'de hem 3.14'te ölçüldü. Sebep: `frozen`ın
+ürettiği `__setattr__`, kapanışında slots'suz **eski** sınıfı tutar; `slots=True` yeni bir
+sınıf ürettiği için `type(self) is cls` yanlış çıkar ve kod `super()` dalına düşer.
+Yalnız `slots` (frozen'sız) kullanılsaydı gerçekten `AttributeError` olurdu.
+**Ders:** iddia doğruydu (typo sessizce geçmiyor), **ölçüm** yanlıştı. "Mantıken şöyle
+olmalı" ile "çalıştırdım, şu çıktı" arasındaki fark tam olarak budur.
+
+**Barış önce şöyle sandı:** `repr=False` olmasaydı dataclass'ın ürettiği `repr` bizim
+elle yazdığımızı ezerdi.
+**Aslında:** dataclass, sınıfın kendi gövdesinde tanımlı bir `__repr__` varsa üstüne
+**yazmaz** — `repr=True` bile olsa maskeleme çalışırdı. `repr=False`'ın asıl işi hata
+modunu güvenli yapmak: yarın biri elle yazılmış `__repr__`'i silerse, `repr=False` ile
+`<Config object at 0x...>` çıkar (sızıntı yok), `repr=True` ile gerçek anahtar basılırdı.
 
 **Yorum nereye yazılır:** "ne yaptığını" anlatan yorum kodu tekrar eder ve kod
 değiştiğinde sessizce yalan söyler. Kodun içindeki yorum yalnızca koda bakarak
