@@ -349,11 +349,22 @@ maliyet optimizasyonu (dosya boyutu, partition sayısı, taranan byte)
 | `docs/ROADMAP.md` | **Plan.** Alt adımlar, bitti tanımları, bağımlılıklar | TR | Adım revize edildikçe |
 | `docs/PROGRESS.md` | **Güncel durum.** Tek durum kaynağı | TR | Her alt adımda |
 | `docs/adr/` | Bu projeye özel, geri alması pahalı kararlar | EN | Karar çıktıkça |
-| `docs/notes/` | Genel öğrenme notları | TR | Adım **bittikten sonra** |
+| `docs/notes/` | Genel öğrenme notları — **ne** ve **neden** | TR | Adım **bittikten sonra** |
+| `docs/runbooks/` | **Prosedür** — bir işi baştan tekrar etme tarifi | TR | İş yapıldıkça |
+| `docs/annotated/` | `src/` altındaki her `.py`'nin satır satır yorumlu aynası | TR | Her yeni `.py` ile aynı commit'te |
 | `docs/TOOLING.md` | Araç manzarası — başvuru haritası | TR | Nadiren. Bu turda araç seçilmiyor |
 
 `adr/` mi `notes/` mi? Testi: *"Bu bilgi başka bir projede de geçerli mi?"*
 Evetse `notes/`, hayırsa `adr/`.
+
+`notes/` mi `runbooks/` mi? Testi: *"Bu bir bilgi mi, bir eylem dizisi mi?"*
+Bilgiyse `notes/` (okunur), eylem dizisiyse `runbooks/` (uygulanır). "Credential chain
+nedir" → `notes/`; "AWS hesabını sıfırdan nasıl kurarım" → `runbooks/`.
+
+**Runbook kuralı:** bir konsol/terminal prosedürü **yapıldığı oturumda** runbook'a yazılır.
+Sebep ölçüldü (2026-08-22): P1.2'nin tamamı — hesap, MFA, budget, IAM kullanıcı, access key —
+yapıldı ama hiçbir yerde tekrar edilebilir biçimde durmuyordu. Kavram notu bu boşluğu
+doldurmaz; not "credential chain nedir"i anlatır, "bunu nasıl kurmuştum"u değil.
 
 `notes/` mi `TOOLING.md` mi? Testi: *"Bu bilgi bir alt adıma bağlı mı?"*
 Bağlıysa `notes/` — o anın öğrenmesidir, dondurulur. Bağlı değilse ve **araç seçerken**

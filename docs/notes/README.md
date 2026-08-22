@@ -64,6 +64,15 @@ aynı "Kısa cevap" bloğu eklendi. Blok yetiyorsa gerisini okumana gerek yok.
 | [17](17-rate-limits-discovery-and-backoff.md) | Rate limit: dört aşamalı keşif protokolü (bash), header standartları, limit algoritmaları, üstel backoff + jitter, retry taksonomisi | 1.8 |
 | [18](18-config-secrets-and-fail-fast.md) | Config vs sabit ayrımı, `.env` tehdit modeli, fail-fast, maskeli `__repr__`, `dataclass` vs `pydantic-settings`, `python-dotenv` öncelik sırası | P1.1 |
 | [19](19-python-language-tools-in-config-py.md) | Python dil araçları: hızlı referans tablosu, iddiaları doğrulayan kanıt komutları, yanlış anlaşılan noktalar. Satır satır anlatım için → `docs/annotated/` | P1.1 |
+| [20](20-aws-sdk-and-boto3.md) | AWS bir API'dir: konsol/CLI/SDK kardeşliği, `boto3` ne yapıyor, SigV4 imzalama, `client` vs `resource`, `Session` | P1.2 |
+| [21](21-aws-credentials-and-the-credential-chain.md) | IAM kavram haritası, access key anatomisi ve kuralları, `~/.aws` iki dosya ayrımı, **credential chain**, güvenlik yapılmayacaklar listesi | P1.2 |
+
+## Prosedürler
+
+Bu klasör **ne** ve **neden**'i tutar; **nasıl yapılır**'ı değil. Bir işi baştan tekrar
+etmen gerekiyorsa (AWS hesabı kurmak, yeni makineye geçmek) → [`docs/runbooks/`](../runbooks/README.md).
+
+Testi: *"Bu bir bilgi mi, bir eylem dizisi mi?"* Bilgiyse buraya, eylem dizisiyse runbook'a.
 
 ## Kodun yorumlu aynası
 

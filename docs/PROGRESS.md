@@ -11,14 +11,102 @@ Kural: bu dosya yalan söyleyebilir (güncellemeyi unutursan). `git log --onelin
 
 ---
 
-**Last updated:** 2026-08-20
+**Last updated:** 2026-08-22
 **Current step:** P1 — Kurulum ve hesaplar ([plan](ROADMAP.md#adım-p1--kurulum-ve-hesaplar))
-**Next sub-step:** **P1.2 — adım 5B'den devam** (AWS CLI kurulumu + `aws configure`).
-P1.1 KAPANDI. Konsol adımları 1–5A yapıldı, terminal tarafı yapılmadı.
+**Next sub-step:** **P1.3 — iki S3 bucket** (konsoldan: isimlendirme, public access blok,
+versioning, klasör şeması). P1.1 ve **P1.2 KAPANDI.**
 
 > **ADIM 0 TAMAMLANDI.** **ADIM 1 TAMAMLANDI** (1.1–1.8).
 > **Adım A–E (dlt/dbt) hiç başlanmadı ve iptal edildi** (ADR-0009).
 > **İLK PYTHON KODU YAZILDI** — `src/lastfm_etl/config.py`, 63 satır. `src/` artık 0 değil.
+
+### 2026-08-22 — P1.2 KAPANDI: AWS CLI kuruldu, kimlik doğrulandı (iş makinesi)
+
+Access key **yeniden üretildi** — ev makinesinde 20 Ağustos'ta üretilen anahtarın secret'ı
+elde değildi. Secret yalnızca üretim ekranında görünür; o ekran kapandıysa anahtar ölüdür.
+
+| Adım | İş | Durum |
+|---|---|---|
+| 5A | IAM → `lastfm-etl-dev` → yeni access key, tag `cli-otomasyon-laptop` | ✔ |
+| 5B | `winget install --id Amazon.AWSCLI -e`, terminal kapat-aç | ✔ |
+| 5C | `aws configure` → key, secret, `eu-central-1`, `json` | ✔ |
+| 5D | `aws sts get-caller-identity` → `Arn` `user/lastfm-etl-dev` ile bitiyor | ✔ |
+
+**Bu oturumda öğrenilen/karara bağlanan:**
+
+| Konu | Sonuç |
+|---|---|
+| Tek anahtar birden çok makinede kullanılır mı | Teknik olarak evet. Ayırmak **tercih**: blast radius, CloudTrail attribution, rotation kolaylığı. IAM limiti kullanıcı başına 2 anahtar → ev + iş tam sınırda. 3. makine gerekirse doğru cevap 3. anahtar değil, SSO |
+| Description tag | Kozmetik değil: tag'siz anahtar teşhis edilemez → silinemez → bilinmeyen aktif anahtar olarak kalır |
+| `aws configure` sırası | 5B'nin 5A'dan **önce** yapılması daha doğru — secret'ın ekranda/CSV'de bekleme süresini kısaltır. Bu turda 5A önce yapıldı, CSV `aws configure` sonrası silindi |
+| AWS anahtarı `.env`'e **girmiyor** | `.env` projenin sözleşmesi, AWS kimliği makinenin kimliği. Ayrıca `.env`'e koysak kodun onu okuması gerekirdi ve P3'te Lambda rolü zinciri kırılırdı |
+
+**Yazılan notlar** (mentor kural ihlali sonrası: `boto3` tanımlanmadan üç mesaj kullanıldı):
+
+- `docs/notes/20-aws-sdk-and-boto3.md` — AWS bir API'dir, `boto3` ne yapıyor, SigV4,
+  `client` vs `resource`
+- `docs/notes/21-aws-credentials-and-the-credential-chain.md` — IAM kavramları, access key
+  kuralları, `~/.aws` iki dosya ayrımı, credential chain, güvenlik listesi
+
+İkisi de `notes/README.md`'deki ~60 satır şablonunu aşıyor (~100 satır). Bilinçli: ikisi de
+sıfırdan kavram kuruyor, hatırlatma tablosu değil. Şablonun "ikiye böl" tavsiyesi uygulandı.
+
+**YENİ DOKÜMAN KATEGORİSİ: `docs/runbooks/`** (2026-08-22)
+
+Barış'ın tespiti: *"Ben 2 ay sonra baktığımda bugün yaptığım işlemleri bu notlara bakıp
+tekrar yapamam."* Doğru — ve eksik olan bir not değil, bir **kategori**ydi. `notes/` bir
+işin *ne* ve *neden*'ini tutuyor, *nasıl*'ını değil. Konsolda yapılan hiçbir şeyin
+(hesap açma, MFA, budget, IAM kullanıcı, access key) tekrarlanabilir kaydı yoktu.
+
+İlk turda yalnız AWS runbook'u yazıldı ve `01` numarası verildi. Barış itiraz etti:
+*"ortadan başlamışız gibi olmuş"* — haklıydı, projenin ilk 35 commit'i runbook'suzdu.
+Aynı oturumda geriye dönük olarak tamamlandı ve numaralandırma kronolojik hale getirildi.
+
+| Dosya | İçerik |
+|---|---|
+| `runbooks/README.md` | Kategori tanımı, `notes` ↔ `adr` ↔ `runbook` ayrım testi, şablon, numaralandırma politikası |
+| `runbooks/00-new-machine-setup.md` | **Yeni makine:** `git clone` → `uv sync` → `.env` → AWS kimliği → beş doğrulama + günlük akış |
+| `runbooks/01-repo-scaffold.md` | **Adım 0:** `git init` → `.gitignore` (+ `check-ignore` doğrulaması) → `.gitattributes` + CRLF normalizasyon dizisi → `pyproject.toml` + `src/` layout → `uv sync` → `.env.example` + README |
+| `runbooks/02-lastfm-api-access.md` | **Adım 1:** key alma → `set -a; source .env` → ilk çağrı → **dört hata deneyi** → sayfalama/`@attr` → fixture kaydetme → rate limit |
+| `runbooks/03-aws-account-bootstrap.md` | **P1.2:** hesap → root MFA → budget → IAM kullanıcı → kullanıcı MFA → access key → CLI → `aws configure` → doğrulama → temizlik (**eski `01`, yeniden numaralandırıldı**) |
+
+Her runbook'ta: bitiş durumu, bölüm başına doğrulama, sorun giderme tablosu, geri alma
+bölümü, **son doğrulama tarihi** (UI ve komutlar eskir).
+
+**Dürüstlük işareti:** `01` ve `02` geriye dönük yazıldı. Ölçüm sonuçları PROGRESS'te
+kayıtlıydı ama bazı komutların birebir metni değildi — o satırlar runbook'ta **⚠ ile
+işaretlendi**: "aynı sonucu üretir, o gün yazılan satırın kopyası değildir". Uydurulmuş
+bir komutun doğrulanmış gibi durması, hiç yazmamaktan kötüdür.
+
+AWS konsol adımları resmî dokümana karşı doğrulandı (IAM user, sanal MFA, budget şablonu).
+
+`PROJECT_CONTEXT.md` §8 doküman tablosu güncellendi: `runbooks/` eklendi, tabloda eksik
+olan `annotated/` de eklendi, `notes/` ↔ `runbooks/` ayrım testi yazıldı.
+
+**Kalan runbook borcu:** `04` — S3 bucket oluşturma, P1.3 bitince.
+
+**Bekleyen doküman borcu — P1.3 bitince yazılacak iki ADR:**
+
+| ADR | Karar | Neden ADR (geri alması pahalı) |
+|---|---|---|
+| **0011** | Bölge: `eu-central-1` | Bucket'ın bölgesi sonradan değişmez; veriyi taşımak gerçek iş |
+| **0012** | **İki bucket** (`raw` + `transformed`), kursun tek bucket + iki prefix'i yerine | Bucket adı küresel benzersiz ve yeniden adlandırılamaz; sonradan birleştirmek/ayırmak veri taşıma demek |
+
+**Bucket topolojisi tartışması (2026-08-22, ADR-0012'nin ham gerekçesi):**
+Kurs tek bucket açıp altına `raw/` ve `transformed/` klasörü koyuyor. İkisi de meşru.
+İki bucket'ın kazancı: (1) transform Lambda'nın kendi çıktısıyla tetiklenip sonsuz döngüye
+girmesi **yapısal olarak** imkânsız hale gelir — tek bucket'ta bunu yalnızca event filtresi
+önler ve filtre unutulabilir; (2) versioning/lifecycle/encryption/bucket policy **bucket
+seviyesinde** ayarlanır, prefix seviyesinde değil — raw ile transformed'ın farklı politikaya
+ihtiyacı var; (3) IAM'de kaynak sınırı `bucket/*` yazmak, prefix deseni yazmaktan daha az
+hata götürür. Maliyet farkı yok, bucket ücretsiz. Bu bir mühendislik tercihi, yayınlanmış
+bir standart değil.
+
+> **Düzeltme (2026-08-22, aynı oturum):** Claude karşı argüman olarak "hesap başına bucket
+> limiti 100" demişti. **Yanlış** — AWS varsayılan kotayı 10.000'e çıkardı. Yani "bucket
+> pahalı bir kaynaktır, prefix'le idare et" argümanı çöktü; iki bucket lehine olan denge
+> daha da güçlendi. Kalan tek karşı argüman: her yeni bucket adı **küresel** namespace'te
+> bir çakışma riski, ve silinen bir bucket adı hemen (hatta hiç) geri gelmeyebilir.
 
 ### 2026-08-20 — OTURUM SONU: nerede kaldık, evde nereden devam
 
