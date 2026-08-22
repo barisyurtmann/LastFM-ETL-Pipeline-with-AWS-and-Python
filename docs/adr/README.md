@@ -70,6 +70,8 @@ only upsides was not a real decision.
 | [0008](0008-transform-with-dbt-on-duckdb.md) | Transform with dbt on DuckDB instead of Python | Superseded by 0009 |
 | [0009](0009-return-to-a-hand-written-python-pipeline.md) | Return to a hand-written Python pipeline | Accepted |
 | [0010](0010-adopt-the-course-architecture-as-the-project-scope.md) | Adopt the course architecture as the project scope | Accepted |
+| [0011](0011-deploy-all-resources-in-eu-central-1.md) | Deploy all resources in eu-central-1 | Accepted |
+| [0012](0012-separate-raw-and-transformed-data-into-two-buckets.md) | Separate raw and transformed data into two S3 buckets | Accepted |
 
 ## When is a decision an ADR?
 

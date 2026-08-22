@@ -66,14 +66,13 @@ bozulursa yeniden numaralandırılabilir. (2026-08-22'de bir kez yapıldı: AWS 
 | [01](01-repo-scaffold.md) | Sıfırdan iskelet: `git init`, `.gitignore`, `.gitattributes` + CRLF normalizasyonu, `pyproject.toml`, `src/` layout, `uv sync`, `.env.example`, README | Proje başına bir kez | Adım 0 |
 | [02](02-lastfm-api-access.md) | Last.fm: key alma, `.env` yükleme, ilk çağrı, **hata yollarını ölçme**, sayfalama, fixture kaydetme, rate limit | Key başına bir kez | Adım 1 |
 | [03](03-aws-account-bootstrap.md) | AWS: hesap, root MFA, budget alarm, IAM kullanıcı, kullanıcı MFA, access key, CLI, `aws configure` | Hesap: bir kez · CLI: her makinede | P1.2 |
+| [04](04-s3-bucket-creation.md) | S3: isimlendirme kuralları, iki bucket, public access blok, versioning, tag, **key şeması** | Ortam başına bir kez | P1.3 |
 
-**Sıfırdan kurulum sırası:** `01` → `02` → `03`. **Yeni makine:** yalnız `00`.
+**Sıfırdan kurulum sırası:** `01` → `02` → `03` → `04`. **Yeni makine:** yalnız `00`.
 
 ## Yazılacaklar (borç)
 
-| # | Konu | Ne zaman |
-|---|---|---|
-| 04 | S3 bucket oluşturma: isimlendirme, public access blok, versioning, key şeması | P1.3 bitince |
+Şu an boş. Yeni bir konsol/terminal prosedürü yapıldığında aynı oturumda buraya yazılır.
 
 ---
 

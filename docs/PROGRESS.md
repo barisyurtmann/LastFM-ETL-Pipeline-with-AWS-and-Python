@@ -12,13 +12,45 @@ Kural: bu dosya yalan söyleyebilir (güncellemeyi unutursan). `git log --onelin
 ---
 
 **Last updated:** 2026-08-22
-**Current step:** P1 — Kurulum ve hesaplar ([plan](ROADMAP.md#adım-p1--kurulum-ve-hesaplar))
-**Next sub-step:** **P1.3 — iki S3 bucket** (konsoldan: isimlendirme, public access blok,
-versioning, klasör şeması). P1.1 ve **P1.2 KAPANDI.**
+**Current step:** **P1 BİTTİ.** Sıradaki: P2 — Local extract + transform
+([plan](ROADMAP.md#adım-p2--local-extract--transform))
+**Next sub-step:** **P2.1 — Extract modülü** (`requests`, `timeout`, gövdeyi status'tan
+önce oku, `error` koduna göre retry, top-100 sayfalama).
 
-> **ADIM 0 TAMAMLANDI.** **ADIM 1 TAMAMLANDI** (1.1–1.8).
+> **ADIM 0 TAMAMLANDI.** **ADIM 1 TAMAMLANDI** (1.1–1.8). **P1 TAMAMLANDI** (P1.1–P1.3).
 > **Adım A–E (dlt/dbt) hiç başlanmadı ve iptal edildi** (ADR-0009).
 > **İLK PYTHON KODU YAZILDI** — `src/lastfm_etl/config.py`, 63 satır. `src/` artık 0 değil.
+> **P2'DEN İTİBAREN her oturumun çıktısı `src/` altında çalışan koddur.**
+
+### 2026-08-22 — P1.3 KAPANDI, P1 BİTTİ: iki bucket ayakta
+
+İki bucket konsoldan oluşturuldu, `aws s3api` ile doğrulandı: bölge `eu-central-1`,
+versioning `Enabled`, dört public access bloğu `true`, `Project=lastfm-etl` tag'i.
+
+**Kararlar ve doküman borcunun kapanışı:**
+
+| Doküman | Karar |
+|---|---|
+| **ADR-0011** | Her kaynak `eu-central-1`'de. Bucket bölgesi değişmez; Glue/Athena/Lambda aynı bölgede olmak zorunda |
+| **ADR-0012** | İki bucket (raw + transformed), kursun tek bucket + prefix'i yerine. Belirleyici gerekçe: transform Lambda'nın kendi çıktısıyla tetiklenmesi **yapısal olarak** imkânsız hale geliyor |
+| **runbook 04** | Bucket oluşturma prosedürü, isimlendirme kuralları, key şeması, geri alma |
+
+**Key şeması kararlaştırıldı, oluşturulmadı** (S3'te klasör yoktur; kod yazdığı anda ağaç
+görünür):
+
+```
+lastfm-etl-raw-<ek>/          to_processed/lastfm_raw_<ISO8601-UTC>.json
+                              processed/lastfm_raw_<ISO8601-UTC>.json
+lastfm-etl-transformed-<ek>/  tracks/  artists/
+```
+
+Zaman damgası **ISO 8601 basic + UTC** (`20260822T030000Z`): alfabetik sıra = kronolojik
+sıra, ve S3 listelemesi alfabetiktir.
+
+**Bucket adındaki `raw/` tekrarı kaldırıldı.** ROADMAP P2.2 key şemasını
+`raw/to_processed/...` diye yazıyordu — bucket adı zaten `...-raw-...` olduğu için bu
+tekrardı (tek-bucket varsayımından kalma). ADR-0012 ve runbook 04 `to_processed/` kullanıyor.
+**ROADMAP.md P2.2 satırı buna göre düzeltilmeli** — açık iş.
 
 ### 2026-08-22 — P1.2 KAPANDI: AWS CLI kuruldu, kimlik doğrulandı (iş makinesi)
 
