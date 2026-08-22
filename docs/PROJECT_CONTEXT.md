@@ -139,6 +139,36 @@ budget alarm) → P1.3 (S3 bucket'lar) → P2 (extract/transform). "Önce local 
 AWS sonra" seçeneği değerlendirildi ve **reddedildi**; P2.2 raw'ı S3'e yazıyor,
 bucket'sız P2 yarım kalırdı.
 
+---
+
+## 1d. Çalışma anlaşması — 2026-08-22: **karma mod** (yürürlükteki kural)
+
+§1c'nin "Claude yazar" kuralı P2'ye gelindiğinde fazla geniş bulundu. Barış'ın ifadesi:
+*"şimdi tüm kodu sen yazarsan anlamayabilirim, ama her şeyi de ben yazamam."*
+
+**Kural: Claude iskeleti yazar, Barış gövdeyi doldurur.**
+
+| Claude yazar | Barış yazar |
+|---|---|
+| Dosya ve modül yapısı, sorumluluk sınırı | **Fonksiyon gövdeleri** |
+| Fonksiyon **imzaları**: ad, parametreler, type hint, dönüş tipi | Kontrol akışı: `if`, döngü, `try` blokları |
+| Docstring'ler — fonksiyonun sözleşmesi | Gerçek mantık |
+| Sabitler, `Enum`'lar, exception sınıf hiyerarşisi | |
+| Gövde yerine `# TODO(barış):` + ne yapılacağının tarifi | |
+
+**Akış:** Claude iskeleti `src/` altına yazar → sohbette her bloğun neden öyle olduğunu
+anlatır → Barış gövdeleri doldurur → çalıştırır → takılırsa Claude **önce ipucu** verir,
+cevabı değil → çalışınca Claude `docs/annotated/` aynasını yazar → Barış commit'ler.
+
+**Ayna en sonda yazılır**, iskelet aşamasında değil: yarım kodun aynası yanlış bilgi taşır.
+
+**İskeletin ölçüsü:** İskelet çalıştırılabilir olmalı (import edilebilir, `NotImplementedError`
+fırlatsa bile), ama iş mantığı içermemeli. Bir fonksiyonun gövdesi tek satırsa ve o satır
+mantığın kendisiyse, o satır Claude'a değil Barış'a aittir.
+
+**Değişmeyen:** §1c'deki "değişmeyenler" listesi aynen geçerli — kodu Barış çalıştırır,
+commit'i Barış atar, ayna aynı commit'te gelir, tek seferde tek alt adım, kapsam şişmesi yok.
+
 > **Not:** bu bölüm reponun kaydıdır. Claude'un davranışını asıl belirleyen metin
 > Claude projesinin **instructions** alanıdır; oradaki "src/'e dokunma" ve "önce soru
 > sor" maddeleri de elle güncellenmelidir, yoksa yeni oturum eski kurala döner.

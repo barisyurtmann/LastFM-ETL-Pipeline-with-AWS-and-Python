@@ -12,10 +12,58 @@ Kural: bu dosya yalan söyleyebilir (güncellemeyi unutursan). `git log --onelin
 ---
 
 **Last updated:** 2026-08-22
-**Current step:** **P1 BİTTİ.** Sıradaki: P2 — Local extract + transform
+**Current step:** P2 — Local extract + transform
 ([plan](ROADMAP.md#adım-p2--local-extract--transform))
-**Next sub-step:** **P2.1 — Extract modülü** (`requests`, `timeout`, gövdeyi status'tan
-önce oku, `error` koduna göre retry, top-100 sayfalama).
+**Next sub-step:** **P2.1 devam ediyor.** İskelet yazıldı, **gövdeler bekliyor**.
+Evde ilk iş: `git pull`, sonra `_request`'in beş adımı.
+
+### 2026-08-22 — OTURUM SONU (iş makinesi): P2.1 iskeleti hazır, gövdeler evde
+
+**Devam noktası: `extract/api.py` içindeki iki `TODO(barış)`.**
+
+| Fonksiyon | Durum |
+|---|---|
+| `_request` | İmza + docstring + tenacity decorator hazır. **Gövde yok** — beş adımlık TODO içeride |
+| `fetch_top_tracks` | İmza + docstring hazır. **Gövde yok** — params sözlüğü + delegasyon |
+
+Evde sırayla: `git pull` → `uv sync` → `_request` → çalıştır → `fetch_top_tracks` → çalıştır.
+Doğrulama komutları TODO'ların altında; mutlu yol **ve** bozuk key ile hata yolu ölçülecek.
+Bozuk key'de **hiç `WARNING` satırı olmamalı** — retry denenmemeli.
+
+**Bu oturumda verilen kararlar:**
+
+| Karar | Gerekçe |
+|---|---|
+| **Karma mod** (`PROJECT_CONTEXT.md` §1d) | §1c'nin "Claude yazar" kuralı fazla genişti. Barış: *"tüm kodu sen yazarsan anlamayabilirim, ama her şeyi de ben yazamam."* Claude iskelet (imza, type hint, docstring, sabit, exception hiyerarşisi), Barış gövde |
+| **Katman klasörleri açıldı**: `extract/`, sonra `transform/` (P2.3), `load/` (P2.2) | 0.3'te "gerçek payload görülünce kararlaşacak" diye ertelenmişti. Payload görüldü, şema kararlaştı, ROADMAP'te iki katman daha kesin — artık tahmin değil plan |
+| `utils/`, `main.py`, `Makefile`, `Dockerfile`, CI **açılmadı** | İhtiyaç doğmadan yazılan yardımcı, hiç silinmeyen ölü koddur. `setup_logging()` ve `main.py` P2.4'te doğacak; geri kalanı ROADMAP → Sonraki tur |
+| Dosya adı `extract/api.py` (`lastfm.py` değil) | Paket zaten `lastfm_etl`; `lastfm_etl.extract.lastfm` kendini tekrar ediyor. Kaynak **türüne** göre adlandırma (`api.py`, ileride `s3.py`) daha genişleyebilir |
+| **tenacity** ile retry, elle döngü değil | Barış: *"kolayı varken zorlaştırmak mantıksız."* Kabul. Ama sınırı yazılı: tenacity retry'ın **nasıl**'ını çözer, **ne zaman**'ını çözmez — `RETRYABLE_ERROR_CODES` taksonomisi ve "gövdeyi status'tan önce oku" sırası aynen duruyor. Tenacity'nin sildiği ~20 satır: elle backoff + retry döngüsü |
+| `reraise=True` | Yoksa tenacity son hatayı `RetryError` içine sarar ve çağıran, karar vermek için gereken Last.fm error kodunu kaybeder |
+| `26` (suspended key) **retryable değil** | Askıya alınmış anahtarı tekrar denemek durumu kötüleştirir |
+
+**ROADMAP'e itiraz — karara bağlanmadı:** P2.1 satırı "top-100 sayfalama" diyor ama 1.8'de
+ölçüldü: `limit=100` tek istekte geliyor (`perPage=100`, tek sayfa). İskelet buna göre
+yazıldı — döngü yok, `page` parametresi imzada duruyor. **ROADMAP P2.1 satırı düzeltilmeli.**
+
+**Yazılan not:** `docs/notes/22-packages-init-and-public-api.md` — `__init__.py`'nin dört
+işi, re-export ve kapsülleme, `__all__`, cold start maliyeti. Tetikleyen soru:
+*"error'lar neden import edilsin ki, onlar sadece raise'lenmiyor mu?"* Cevap: `raise` eden
+modül import etmez, **`except` eden çağıran eder** — exception'lar arayüzün parçasıdır.
+
+**ADR borcu — kod çalışınca yazılacak, önce değil:**
+
+| ADR | Konu |
+|---|---|
+| 0013 | Katman bazlı paket yapısı (`extract/`, `transform/`, `load/`) |
+| 0014 | Retry için tenacity bağımlılığı |
+
+Sebep `adr/README.md`'nin kendi kuralı: *"An ADR is written after the code that justifies
+it works."* Bu repoda ADR-0007 ve 0008 bu kurala uyulmadığı için yazıldı ve tek satır kod
+çalışmadan supersede edildi.
+
+**Ayna borcu:** `docs/annotated/` içine `extract/api.py` ve `extract/__init__.py` aynaları
+**gövdeler bitince** yazılacak. Yarım kodun aynası yanlış bilgi taşır.
 
 > **ADIM 0 TAMAMLANDI.** **ADIM 1 TAMAMLANDI** (1.1–1.8). **P1 TAMAMLANDI** (P1.1–P1.3).
 > **Adım A–E (dlt/dbt) hiç başlanmadı ve iptal edildi** (ADR-0009).

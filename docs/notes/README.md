@@ -66,6 +66,7 @@ aynı "Kısa cevap" bloğu eklendi. Blok yetiyorsa gerisini okumana gerek yok.
 | [19](19-python-language-tools-in-config-py.md) | Python dil araçları: hızlı referans tablosu, iddiaları doğrulayan kanıt komutları, yanlış anlaşılan noktalar. Satır satır anlatım için → `docs/annotated/` | P1.1 |
 | [20](20-aws-sdk-and-boto3.md) | AWS bir API'dir: konsol/CLI/SDK kardeşliği, `boto3` ne yapıyor, SigV4 imzalama, `client` vs `resource`, `Session` | P1.2 |
 | [21](21-aws-credentials-and-the-credential-chain.md) | IAM kavram haritası, access key anatomisi ve kuralları, `~/.aws` iki dosya ayrımı, **credential chain**, güvenlik yapılmayacaklar listesi | P1.2 |
+| [22](22-packages-init-and-public-api.md) | Modül vs paket, `__init__.py`'nin dört işi, re-export ve kapsülleme, **exception'ların neden arayüzün parçası olduğu**, `__all__`, cold start maliyeti | P2.1 |
 
 ## Prosedürler
 
