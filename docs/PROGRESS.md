@@ -11,11 +11,115 @@ Kural: bu dosya yalan söyleyebilir (güncellemeyi unutursan). `git log --onelin
 
 ---
 
-**Last updated:** 2026-08-22
+**Last updated:** 2026-08-24
 **Current step:** P2 — Local extract + transform
 ([plan](ROADMAP.md#adım-p2--local-extract--transform))
-**Next sub-step:** **P2.1 devam ediyor.** İskelet yazıldı, **gövdeler bekliyor**.
-Evde ilk iş: `git pull`, sonra `_request`'in beş adımı.
+**Next sub-step:** **P2.1 kod tarafı bitti, sayfalama kararı açık.** `_request` ve
+`fetch_top_tracks` çalışıyor; mutlu yol ve hata yolu ölçüldü. Kapanmadan önce tek soru
+var: sayfalama döngüsü nereye ait? Aşağıda.
+
+### 2026-08-24 — OTURUM: P2.1 request yolu çalışıyor
+
+**Yazılan kod:** `src/lastfm_etl/extract/api.py` (151 satır). `_request` beş adımlı
+sırayla gövdelendi, `fetch_top_tracks` params + delegasyon.
+
+**Ölçüldü:**
+
+| Yol | Sonuç |
+|---|---|
+| Mutlu yol, `limit=5` | `@attr` geldi, 5 kayıt |
+| Bozuk key | `LastfmAPIError` code 10, **hiç `WARNING` yok** — kalıcı hata retry edilmedi |
+
+İkinci satır, ADR-0014'ün taksonomi iddiasının çalıştığının kanıtı. Retry mekanizması
+tenacity'nin, ama "ne zaman" kararı bizim kodumuzda ve doğru davranıyor.
+
+**İskelette bulunan hata — düzeltildi.** 22 Ağustos'ta yazılan TODO, JSON çözülemediğinde
+koşulsuz `LastfmError` (kalıcı) fırlatıyordu. Gerçek senaryo: API'nin önündeki gateway 503
+döndüğünde gövde HTML olur. O sırayla, retry edilmesi gereken geçici bir arıza kalıcı
+sayılır ve tenacity hiç devreye girmezdi. Düzeltme: decode hatasında **önce status'a bak**.
+Ders: hata sınıflandırması tek bir sinyale (burada "JSON mu?") dayandırılırsa, o sinyalin
+başka sebeplerle de bozulabildiği durumlar sessizce yanlış tarafa düşer.
+
+**Barış'ın ilk denemesi ve neden yanlıştı** (aynada da duruyor):
+
+```python
+except (LastfmTransientError):
+    raise
+```
+
+İki ayrı hata. (1) `session.get()` asla `LastfmTransientError` fırlatmaz — o *bizim
+fırlatmak istediğimiz* tip, `requests`'in fırlattığı değil (`requests.RequestException`).
+Bu `except` hiçbir zaman tetiklenmez. (2) Çıplak `raise` yakalananı aynen tekrar fırlatır,
+yani blok hiçbir iş yapmaz. `try/except`in amacı **tip çevirmektir**: alt katmanın hatası
+→ bizim domain hatamız.
+
+**Bu oturumda verilen kararlar:**
+
+| Karar | Gerekçe |
+|---|---|
+| **Yorum politikası değişti**: `src/` altında az yorum (sadece *neden*), ders tamamen `docs/annotated/` aynasına | Barış: *"orjinal kodda çok not olmasın."* Portfolyo dosyası temiz kalır, öğrenme materyali aynada birikir. `annotated/README.md` sözleşmesi zaten bunu öngörüyordu |
+| `TOP_TRACKS_METHOD` sabiti açıldı | Aynı string üç yere gidiyor: request params, log satırı, exception mesajı. Üçünden birindeki yazım hatası **sessiz** olurdu |
+| `int(payload["error"])` bir `try` içinde | `RETRYABLE_ERROR_CODES` bir `frozenset[int]`. API bir gün `"29"` (string) dönerse `"29" in {29}` sessizce `False` olur ve retry hiç çalışmaz |
+| `raise_for_status()` **kullanılmadı** | Last.fm geçersiz key'e HTTP 200 döner — `raise_for_status` en kritik hatayı hiç görmez. Ayrıca fırlattığı `HTTPError` bizim tipimiz değil, tenacity onu retry etmez |
+
+**Kapatılan ADR borcu:** 0013 (katman bazlı paket yapısı), 0014 (tenacity). İkisi de
+"kod çalışınca yazılır" kuralına uyularak, kod ölçüldükten **sonra** yazıldı.
+
+**Yazılan ayna:** `docs/annotated/src/lastfm_etl/extract/api.py` (746 satır). Bölüm 0'da
+yedi ön koşul kavram: exception nesnesi ve `raise`, `except`in kalıtımla eşleşmesi,
+`try/except/as/from` zinciri, decorator'ın ne olduğu, keyword-only `*`, `frozenset` + `in`
+tuzağı, `requests` Session/Response. Sapma kontrolü temiz.
+
+---
+
+### AÇIK KARAR — P2.1 bunsuz kapanmaz: sayfalama döngüsü nereye ait?
+
+`fetch_top_tracks` **tek sayfa** döndürüyor. ADR-0006 ise "hedef sayıya kadar sayfalama"
+diyor ve gerekçesi kayıtlı: `limit=100` bugün çalışıyor ama Last.fm `limit`'i kırparsa
+cevap **sessizce kısa** gelir, hata fırlamaz.
+
+Yani bir döngü gerekiyor ve henüz hiçbir yerde yok. Üç seçenek:
+
+| Seçenek | Sonuç |
+|---|---|
+| `extract/api.py` içinde ikinci bir fonksiyon (`fetch_top_tracks_until`) | Sayfalama extract'ın işi sayılır. P2.1'in kapsamı büyür ama ROADMAP P2.1 satırı zaten "top-100 sayfalama" diyor |
+| Çağıranda (P2.2, raw yazan kod) | `api.py` saf kalır: tek çağrı = tek istek. Ama sayfalama mantığı raw yazma koduna karışır |
+| Hiç döngü yok, `limit=100` tek istek | Ölçüldü ve çalışıyor. ADR-0006'nın gerekçesini **çürütmeden** iptal etmek olur — yapılırsa yeni ADR gerekir |
+
+**Bununla bağlantılı, PROGRESS'te zaten duran kısıt:** raw katman her sayfayı **ayrı** ve
+`@attr` ile birlikte saklamak zorunda, aksi halde `rank` kurtarılamaz. Döngü nereye
+konursa konsun bu kısıt geçerli.
+
+**ROADMAP itirazı hâlâ karara bağlanmadı:** P2.1 satırındaki "top-100 sayfalama" ifadesi,
+yukarıdaki karar verilince ya doğrulanır ya düzeltilir. Karar önce, ROADMAP sonra.
+
+---
+
+### Öğrenme yöntemi — bu oturumda konuşuldu, karara bağlanmadı
+
+Barış: *"kodu %60-70 anlayabiliyorum ama kendim asla yazabilecek gibi değilim."*
+
+Teşhis: **tanıma–üretme açığı** (recognition–recall gap). Okurken anlamak, üretebilmenin
+kanıtı değil; akıcı görünen materyal öğrenildiği yanılsaması üretir. LLM ile çalışmak bunu
+tarihte hiç olmadığı kadar kolaylaştırıyor.
+
+Ayrım yapılmalı: `wait_exponential_jitter` parametrelerini ezberden yazamamak **normal**
+(kimse yazmaz, aranır). "Önce gövdeyi oku, sonra status'a bak" sırasını yazamamak
+**normal değil** — o bir karar, sözdizimi değil.
+
+Bedeli üç yerde ödenir: prod'da gece 3'te teşhis, üretilen kodun sessizce yanlış olduğu
+anı görebilmek (bu oturumda tam olarak yaşandı — iskeletteki hatayı Barış fark etmedi),
+ve mülakatta kendi yazmadığın kodun gerekçesini savunmak.
+
+Önerilen ama **seçilmeyen** yöntem: 3 satırlık versiyondan başlayıp 8 turda büyütmek
+(her turda 3-5 yeni satır, her tur tek bir sorunu ekliyor). Barış "böyle devam edelim"
+dedi. Kabul edilen şart: **aynadaki KANIT komutları terminalde çalıştırılacak.**
+Çalıştırılmayan açıklama okunmuş sayılmaz.
+
+Bir sonraki alt adımda tekrar değerlendirilecek. Aday ara basamak: boşluklu iskelet
+(*faded worked example*) — ben imzayı ve yorumları veririm, gövdedeki isimleri Barış
+doldurur.
+
 
 ### 2026-08-22 — OTURUM SONU (iş makinesi): P2.1 iskeleti hazır, gövdeler evde
 
