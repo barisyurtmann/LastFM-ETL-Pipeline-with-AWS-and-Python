@@ -96,6 +96,7 @@ not ondan türetilir.
 | Ayna | Satır | Kapsadığı konular |
 |---|---|---|
 | [`src/lastfm_etl/config.py`](src/lastfm_etl/config.py) | ~550 | **Bölüm 0:** modül/import anı, class-instance-`self`, dunder metotlar, kalıtım, exception ve `raise`, docstring. **Bölüm 1:** PEP 8 import sırası, logging (Logger/Handler/Level, `__name__`), type hint + `Final` + `tuple[str, ...]` + mypy, `RuntimeError` kalıtımı, `@dataclass`ın ürettiği kod, `frozen`/`slots`/`repr=False`, `__post_init__`, `fields()`, `getattr`, `.strip()`, `", ".join()`, maskeli `__repr__`, `lru_cache` sarmalayıcısı, ortam değişkeni nedir, `find_dotenv`/`override=False`, `%s` logging |
+| [`src/lastfm_etl/extract/api.py`](src/lastfm_etl/extract/api.py) | ~745 | **Bölüm 0:** exception nesnesi ve `raise`, `except`in kalıtımla eşleşmesi, `try/except/as/from` ve zincirleme, decorator'ın ne olduğu, keyword-only `*`, `frozenset` + `in` tuzağı, `requests` Session/Response ve `raise_for_status`'ın neden yokluğu. **Bölüm 1:** `from __future__ import annotations`, PEP 8 import sırası, tenacity'nin beş parçası, `Final`, `(connect, read)` timeout, retry bütçesi, hata taksonomisi, dar `try` kuralı, gövde-status sırası, `!r`, `.get()` vs `[]`, `%s` logging, `or` ve mutable default argument tuzağı |
 
 ---
 
