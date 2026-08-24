@@ -13,7 +13,7 @@ Testi tek soru: **"Bu bilgi başka bir projede de geçerli mi?"**
 
 ## Not şablonu — 20'den sonraki her not
 
-Her not **en fazla ~60 satır** ve hep aynı dört bölüm:
+Her not **en fazla ~60 satır** ve hep aynı beş bölüm:
 
 ```markdown
 # 20 — Başlık
@@ -32,14 +32,31 @@ Her not **en fazla ~60 satır** ve hep aynı dört bölüm:
 
 ## Kanıt
 <çalıştırılıp doğrulanacak komut ve beklenen çıktı>
+
+## Mülakat cevabı
+<soru + karar → gerekçe → trade-off sırasıyla üç-dört cümle. Karar yoksa "—">
 ```
 
 Sınır bir kalite kuralı değil, bir **öncelik zorlayıcısıdır**: sınır yokken her şey içeri
 girer ve 400 satırlık bir not bir daha hiç açılmaz. Konu 60 satıra sığmıyorsa ya ikiye
 bölünür ya da satır satır anlatım [`docs/annotated/`](../annotated/README.md)'a gider.
 
+**Mülakat cevabı bölümü** notun tek *sözlü* çıktısıdır. Bir konuyu bilmek ile onu 30
+saniyede gerekçesiyle savunabilmek ayrı becerilerdir; ikincisi yazılmadığı sürece gelişmez.
+
+Format: bir soru, ardından **karar → gerekçe → trade-off**. "Şunu kullandık" bir cevap
+değildir — cevap, alternatifi neden elediğini ve **hangi koşulda başka seçeceğini** içerir.
+Son cümle genellikle en değerlisidir: kararın sınırını bilmek, kararı bilmekten zordur.
+
+**Her notta olmak zorunda değil.** Saf referans notlarında (komut listeleri, syntax)
+savunulacak bir karar yoktur; bölüm `—` ile geçilir. Uydurulmuş bir mülakat sorusu,
+doldurulmuş bir alandan başka bir şey değildir.
+
 **01–19 arası notlar bu şablondan önce yazıldı.** Onlar budanmadı; her birinin başına
 aynı "Kısa cevap" bloğu eklendi. Blok yetiyorsa gerisini okumana gerek yok.
+`Mülakat cevabı` bloğu eski notlara **toplu olarak** eklenmez — konu iş sırasında
+tekrar karşımıza çıktığında o notun bloğu yazılır. Geriye dönük toplu doldurma,
+hatırlanmayan kararlar için uydurma cevap üretir.
 
 ## İçindekiler
 

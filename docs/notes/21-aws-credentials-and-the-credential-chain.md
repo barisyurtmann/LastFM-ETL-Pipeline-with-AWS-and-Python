@@ -208,7 +208,35 @@ anahtarı girilmiştir, devam edilmez.
 
 ---
 
-## 10. Bir sonraki turda (bu projede yok)
+## 10. Mülakat cevabı
+
+**S: "AWS'ye nasıl kimlik doğruluyorsunuz?"**
+
+Kalıcı access key, `~/.aws/credentials` içinde. Tek hesaplı bir öğrenme ortamı için
+bilinçli tercih: Identity Center kurmak buradaki mühendislik dersini getirmeden
+operasyonel yük ekliyordu. Ekipte SSO + geçici kimlik kullanırdım — sızan bir anahtarın
+ömrü saatlerle sınırlanır, diskte kalıcı sır kalmaz. Kalıcı anahtarı savunulabilir kılan
+şey rotation ve tag disiplini; o disiplin yoksa tercih de savunulamaz.
+
+**S: "Aynı kod hem laptopta hem Lambda'da çalışıyor. Kimlik bilgisini nereden alıyor?"**
+
+Hiçbir yerden — biz vermiyoruz. `boto3` credential chain'i sırayla tarar: laptopta 3.
+basamak (`~/.aws/credentials`), Lambda'da 5. basamak (execution role'ün metadata servisi)
+kazanır. Kimliği kodun **kendisinin** okuması, kodu ortama bağlar:
+`os.environ["AWS_SECRET_ACCESS_KEY"]` yazan bir uygulama Lambda'da patlar ve iki ortam
+için iki kod yolu doğurur. Zincirin varlık sebebi bu ayrımı gereksiz kılmaktır.
+
+**S: "İki makinede çalışıyorsun, anahtarı kopyalasan olmaz mıydı?"**
+
+Teknik olarak olurdu, tercih etmedim. Ayrı anahtar iki şey verir: **blast radius** — bir
+makine kaybolursa yalnız o anahtar iptal edilir, diğer makinenin işi durmaz; ve
+**attribution** — CloudTrail'de çağrının hangi makineden geldiği ayırt edilir. Bedeli,
+kullanıcı başına 2 anahtar limitine yaklaşmak. Üçüncü makine gerekirse doğru cevap üçüncü
+anahtar değil, SSO.
+
+---
+
+## 11. Bir sonraki turda (bu projede yok)
 
 - IAM Identity Center (SSO) ile geçici kimlik
 - `AssumeRole` ve `~/.aws/config` içinde `role_arn` + `source_profile` zinciri

@@ -18,6 +18,66 @@ Kural: bu dosya yalan söyleyebilir (güncellemeyi unutursan). `git log --onelin
 `fetch_top_tracks` çalışıyor; mutlu yol ve hata yolu ölçüldü. Kapanmadan önce tek soru
 var: sayfalama döngüsü nereye ait? Aşağıda.
 
+### 2026-08-24 — OTURUM (ev makinesi): ortam kurulumu, IAM kullanıcı yeniden adlandırıldı
+
+**Kod yazılmadı — bu bir kurulum oturumu.** P2.1'in açık kararı (sayfalama döngüsü nereye
+ait) el değmeden duruyor, aşağıdaki bölümde.
+
+**Ev makinesi durumu:**
+
+| Kontrol | Sonuç |
+|---|---|
+| `git status` | temiz, `main...origin/main` |
+| Python | 3.14.5 — `requires-python = ">=3.14,<3.15"` aralığında |
+| `.env` | var, `LASTFM_API_KEY` dolu |
+| `.venv` | **bayat bulundu**, `uv sync` gerekiyor — çıktısı bu oturumda doğrulanmadı |
+| AWS CLI | `aws-cli/2.36.29` kuruldu, `aws configure` yapıldı, region `eu-central-1` |
+| Access key | bu makine için **ayrı** anahtar üretildi (description tag'li). Kullanıcı başına 2 anahtar limitinin ikincisi; üçüncü makine gerekirse doğru cevap 3. anahtar değil, SSO |
+
+`.venv` neden bayattı: 10 Ağustos'ta kurulmuş, içinde yalnızca editable install vardı.
+`requests`, `tenacity` ve `python-dotenv` sonradan eklendi (`35f97a2`, `ecd3ac9`).
+**`git pull` bağımlılık getirmez** — `.venv/` gitignore'lu, gelen şey yalnızca `uv.lock`.
+Runbook 00'ın `git pull → uv sync` sırası tam bu yüzden var; atlanırsa hata
+`ModuleNotFoundError` olarak, bağımlılığın eklenmesinden günler sonra çıkar.
+
+**IAM kullanıcı yeniden adlandırıldı: `lastfm_etl_dev` → `lastfm-etl-dev`.**
+
+Sapma 22 Ağustos'taki P1.2 oturumunda doğmuş: üç doküman (runbook 00, runbook 03, not 21)
+kullanıcıyı tire ile yazmış, AWS'de duran kaynak alt çizgiliydi. **Doküman değil, kaynak
+düzeltildi.** İki sebep: S3 bucket adları alt çizgi kabul etmez, yani projenin geri kalanı
+zaten tire; ve maliyet bugün ~0 — ARN'e referans veren policy yok (`AdministratorAccess`
+AWS-managed). P3.4'te rol trust policy'leri yazıldıktan sonra aynı işlem elle policy
+düzeltmesi gerektirirdi.
+
+Yöntem: **bu işlem konsolda yok.** `aws iam update-user --user-name <eski>
+--new-user-name <yeni>`. AWS dokümanı açıkça *"There is no option in the console to rename
+a user"* diyor. Bu, not 20'deki "konsol API'nin bir istemcisidir" iddiasının somut kanıtı:
+konsol her operasyonu göstermek zorunda değil. Junior refleksi "konsolda yoksa yapılamaz"
+demek; doğru refleks API referansına bakmak.
+
+Değişen: ARN ve konsola giriş kullanıcı adı. Değişmeyen: `UserId` (`AIDA...`), access
+key'ler, MFA cihazı, bağlı policy'ler. Kalıcı kimlik `UserId`, okunabilir kimlik ad —
+`surrogate key` / `natural key` ayrımının aynısı, P2.3'te tekrar çıkacak.
+
+Düzeltmenin gerçek gerekçesi kozmetik değil: runbook'un doğrulama adımı *"`Arn`
+`user/lastfm-etl-dev` ile bitmeli, bitmiyorsa dur"* diyor. Bırakılsaydı üçüncü bir makinede
+**doğru** kurulum "dur" sinyali verirdi. Yanlış alarm veren kontrol, kontrolsüzlükten
+kötüdür — insan bir süre sonra o adımı atlamayı öğrenir, ve gerçekten bozulduğu gün de atlar.
+
+**ADR yazılmadı — bilinçli.** ADR kuralı "geri alması pahalı kararlar". Yeniden adlandırma
+bugün ucuz ve geri alınabilir; bir isimlendirme sözleşmesi ADR'si de henüz genelleştirecek
+kadar veri yok (tek örnek). Karar P3.4'te rol adlarıyla tekrarlanırsa ADR adayı olur.
+
+**Not şablonu genişletildi (`notes/README.md`):** beşinci bölüm — `Mülakat cevabı`.
+Format **karar → gerekçe → trade-off**; karar içermeyen saf referans notlarında `—` ile
+geçilir. Eski notlara **toplu doldurulmaz**: hatırlanmayan bir kararın gerekçesi yazıldığında
+üretilmiş bir cevap olur, hatırlanmış değil. İlk uygulama not 21 §10 — access key vs SSO,
+credential chain'in kodu ortamdan bağımsız kılması, makine başına ayrı anahtar.
+
+**Ev makinesinde kapatılmamış tek iş:** `uv sync` + üç doğrulama komutunun çalıştırılması.
+
+---
+
 ### 2026-08-24 — OTURUM: P2.1 request yolu çalışıyor
 
 **Yazılan kod:** `src/lastfm_etl/extract/api.py` (151 satır). `_request` beş adımlı
