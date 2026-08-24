@@ -24,22 +24,18 @@ from lastfm_etl.config import Config
 logger = logging.getLogger(__name__)
 
 BASE_URL: Final = "http://ws.audioscrobbler.com/2.0/"
+TOP_TRACKS_METHOD: Final = "chart.getTopTracks"
 
-# (connect, read). Split because the two fail for different reasons: a connect timeout
-# means the host never answered, a read timeout means it accepted the connection and then
-# went quiet. A single number hides which one happened. Never omit it — without a timeout
-# requests waits forever and a Lambda dies on its own timeout with no useful log line.
+# (connect, read): a connect timeout means the host never answered, a read timeout means
+# it answered and then went quiet. Never omit — without it requests waits forever.
 DEFAULT_TIMEOUT: Final[tuple[float, float]] = (3.05, 10.0)
 
 MAX_ATTEMPTS: Final = 4
 MAX_BACKOFF_SECONDS: Final = 30
 
-# Last.fm reports its real failure in the body, not the status line. These codes describe
-# a condition that may clear on its own; every other code is permanent, and retrying a
-# permanent failure only burns the rate limit.
-#   8  operation failed      11  service offline
-#   16 temporary error       29  rate limit exceeded
-# 26 (suspended API key) is deliberately absent: retrying a suspended key makes it worse.
+# Last.fm reports its real failure in the body, not the status line. Only these codes
+# describe a condition that may clear on its own; 26 (suspended key) is deliberately
+# absent, because retrying a suspended key makes it worse.
 RETRYABLE_ERROR_CODES: Final[frozenset[int]] = frozenset({8, 11, 16, 29})
 
 RETRYABLE_STATUS_CODES: Final[frozenset[int]] = frozenset({429, 500, 502, 503, 504})
@@ -50,10 +46,7 @@ class LastfmError(Exception):
 
 
 class LastfmAPIError(LastfmError):
-    """The API answered, and the answer was an error document.
-
-    Carries the Last.fm error code so callers can branch on it instead of parsing text.
-    """
+    """The API answered, and the answer was an error document."""
 
     def __init__(self, code: int, message: str) -> None:
         super().__init__(f"Last.fm error {code}: {message}")
@@ -62,23 +55,15 @@ class LastfmAPIError(LastfmError):
 
 
 class LastfmTransientError(LastfmError):
-    """A failure that may succeed if the same call is repeated later.
-
-    This is the only exception tenacity retries. Raising it is a decision, not a
-    description: see RETRYABLE_ERROR_CODES.
-    """
+    """A failure that may succeed if the same call is repeated later."""
 
 
 @retry(
-    # Only transient failures are retried. LastfmAPIError escapes on the first attempt —
-    # a wrong API key does not become right on the fourth try.
     retry=retry_if_exception_type(LastfmTransientError),
     stop=stop_after_attempt(MAX_ATTEMPTS),
-    # Full jitter: min(initial * 2**n + uniform(0, jitter), max). Without the random part
-    # every client that failed at the same moment retries at the same moment.
     wait=wait_exponential_jitter(initial=1, max=MAX_BACKOFF_SECONDS),
     before_sleep=before_sleep_log(logger, logging.WARNING),
-    # Without this, tenacity wraps the final failure in RetryError and the caller loses
+    # Without this the final failure arrives wrapped in RetryError and the caller loses
     # the Last.fm error code it needs to act on.
     reraise=True,
 )
@@ -91,27 +76,51 @@ def _request(
 ) -> dict[str, Any]:
     """Perform one HTTP call and return the decoded payload.
 
-    Retried by tenacity while it raises LastfmTransientError.
-
     Raises:
         LastfmTransientError: network failure, or a status/error code worth retrying.
         LastfmAPIError: the API returned a permanent error document.
-        LastfmError: the response was not JSON at all.
-
-    TODO(barış): implement in this order — the order is the lesson.
-      1. session.get(BASE_URL, params=params, timeout=timeout), wrapping ONLY that call
-         in try/except requests.RequestException -> raise LastfmTransientError(...) from exc.
-      2. Decode the body BEFORE looking at the status: response.json() inside
-         try/except ValueError. On failure raise LastfmError including
-         response.status_code and response.text[:200] — a bare JSONDecodeError says
-         "char 0" and nothing else.
-      3. If "error" in payload: read code and message. Raise LastfmTransientError if the
-         code is in RETRYABLE_ERROR_CODES, otherwise LastfmAPIError(code, message).
-      4. Only now check response.status_code: LastfmTransientError if it is in
-         RETRYABLE_STATUS_CODES, LastfmError if it is >= 400 with no error document.
-      5. Return payload.
+        LastfmError: the response was not JSON, or carried a bad status and no error
+            document.
     """
-    raise NotImplementedError
+    try:
+        response = session.get(BASE_URL, params=params, timeout=timeout)
+    except requests.RequestException as exc:
+        raise LastfmTransientError(f"{method}: request failed: {exc}") from exc
+
+    try:
+        payload: dict[str, Any] = response.json()
+    except ValueError as exc:
+        # A gateway in front of the API answers 5xx with HTML, so the decode failure
+        # alone would call a temporary outage permanent.
+        if response.status_code in RETRYABLE_STATUS_CODES:
+            raise LastfmTransientError(
+                f"{method}: HTTP {response.status_code} with a non-JSON body"
+            ) from exc
+        raise LastfmError(
+            f"{method}: HTTP {response.status_code} returned a non-JSON body: "
+            f"{response.text[:200]!r}"
+        ) from exc
+
+    # Checked before the status, because an invalid API key arrives with status 200.
+    if "error" in payload:
+        try:
+            code = int(payload["error"])
+        except (TypeError, ValueError) as exc:
+            raise LastfmError(f"{method}: unreadable error document: {payload!r}") from exc
+        message = str(payload.get("message", ""))
+        if code in RETRYABLE_ERROR_CODES:
+            raise LastfmTransientError(f"{method}: Last.fm error {code}: {message}")
+        raise LastfmAPIError(code, message)
+
+    # Backstop: valid JSON, no error document, but a status that still means failure.
+    if response.status_code in RETRYABLE_STATUS_CODES:
+        raise LastfmTransientError(f"{method}: HTTP {response.status_code}")
+    if response.status_code >= 400:
+        raise LastfmError(
+            f"{method}: HTTP {response.status_code} with no error document"
+        )
+
+    return payload
 
 
 def fetch_top_tracks(
@@ -125,16 +134,18 @@ def fetch_top_tracks(
 
     The payload is deliberately not reshaped: the raw layer stores this verbatim, and
     ``@attr`` (page, perPage, total) must survive because rank is derived from it.
-
-    TODO(barış): build the params dict and delegate to _request.
-      - params: method="chart.getTopTracks", api_key (config.lastfm_api_key),
-        format="json", limit, page. limit and page as str — requests would coerce ints,
-        but being explicit keeps the request identical every time.
-      - format="json" is not optional: without it the API returns XML with status 200.
-      - reuse the caller's session if given, otherwise requests.Session() so the TCP
-        handshake is not repeated per call.
-      - log at INFO before the call: method, page, limit. Never log params — it holds
-        the key. Use %s formatting, not f-strings: logging skips formatting entirely
-        when the level is disabled.
     """
-    raise NotImplementedError
+    params = {
+        "method": TOP_TRACKS_METHOD,
+        "api_key": config.lastfm_api_key,
+        # Not optional: without it the API answers with XML and status 200.
+        "format": "json",
+        "limit": str(limit),
+        "page": str(page),
+    }
+
+    # %s, not an f-string: logging skips formatting when the level is disabled. params is
+    # never logged — it carries the API key.
+    logger.info("fetching %s page=%s limit=%s", TOP_TRACKS_METHOD, page, limit)
+
+    return _request(session or requests.Session(), TOP_TRACKS_METHOD, params)
