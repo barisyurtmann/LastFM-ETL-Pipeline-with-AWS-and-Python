@@ -74,6 +74,7 @@ only upsides was not a real decision.
 | [0012](0012-separate-raw-and-transformed-data-into-two-buckets.md) | Separate raw and transformed data into two S3 buckets | Accepted |
 | [0013](0013-structure-the-package-by-pipeline-layer.md) | Structure the package by pipeline layer | Accepted |
 | [0014](0014-use-tenacity-for-retry.md) | Use tenacity for retry instead of a hand-written loop | Accepted |
+| [0015](0015-paginate-inside-the-extraction-layer-and-return-unmerged-pages.md) | Paginate inside the extraction layer and return unmerged pages | Accepted |
 
 ## When is a decision an ADR?
 

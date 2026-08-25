@@ -11,12 +11,54 @@ Kural: bu dosya yalan söyleyebilir (güncellemeyi unutursan). `git log --onelin
 
 ---
 
-**Last updated:** 2026-08-24
+**Last updated:** 2026-08-25
 **Current step:** P2 — Local extract + transform
 ([plan](ROADMAP.md#adım-p2--local-extract--transform))
-**Next sub-step:** **P2.1 kod tarafı bitti, sayfalama kararı açık.** `_request` ve
-`fetch_top_tracks` çalışıyor; mutlu yol ve hata yolu ölçüldü. Kapanmadan önce tek soru
-var: sayfalama döngüsü nereye ait? Aşağıda.
+**Next sub-step:** **P2.2 — raw'ı S3'e yaz.** P2.1 **kapandı**: extract modülü sayfalama
+dahil çalışıyor, dört kontrol de geçti, ADR-0015 ve notlar 23-24 yazıldı.
+
+### 2026-08-25 — P2.1 KAPANDI: sayfalama yazıldı, ölçüldü
+
+**Yazılan kod:** `extract/api.py` +58 satır — üç sabit (`DEFAULT_PAGE_SIZE`,
+`TARGET_TRACK_COUNT`, `MAX_PAGES`), `_track_records` yardımcısı, `fetch_top_tracks_pages`.
+`__init__.py` public yüzeye eklendi.
+
+**Açık karar çözüldü → ADR-0015.** Döngü `extract/api.py` içinde, dönüş tipi
+`list[dict[str, Any]]` — sayfalar **birleştirilmeden**, olduğu gibi. Üç gerekçe: sayfalama
+kaynağın taşıma detayıdır (iş kuralı değil), birleştirme `@attr`'ı siler ve `rank`
+kurtarılamaz olur, `requests.Session` katman sınırını geçmemelidir.
+
+**Barış'ın cevabı ve neden yanlıştı.** Durma koşulu olarak *"`ceil(target / page_size)`
+kadar sayfa çek"* seçildi. Bu, `page_size`'ın **uygulandığını varsayan** bir aritmetik.
+Last.fm `limit`'i kırparsa cevap HTTP 200 ile sessizce kısa gelir: 100 istenir, 40 gelir,
+formül "1 sayfa yeter" dediği için döngü biter ve 40 kayıt tam sayılır. ADR-0006'nın
+yazılma sebebi tam olarak buydu. Doğru cevap **aldığın kaydı saymak** + iki koruma
+(boş sayfa, sayfa tavanı). Junior tuzağı tek cümlede: **gözleme değil hesaba güvenmek.**
+
+**Fark edilen gizli karar: `page_size` hedefin altında olmalı.** 100/100 seçilseydi döngü
+her koşuda tam bir tur döner, sayfalama kodu üretimde hiç sınanmaz, gerçekten gerektiği
+gün ilk kez çalışırdı. 50 seçildi → her koşu 2 tur. Bedeli günde 1 yerine 2 istek.
+PROGRESS'te 1.8'de duran *"sayfalama kodu her koşuda birkaç kez çalışır, ölü kod olmaz"*
+cümlesi ancak bu seçimle doğru.
+
+**Ölçüldü (dördü de geçti):** mutlu yol 2 sayfa `perPage=50` · `page_size=100` → 1 sayfa
+(durma koşulunun sayıma baktığının kanıtı) · `target=10**6, max_pages=3` → 3 sayfa +
+`WARNING` (`for/else` çalışıyor) · bozuk key → `LastfmAPIError` code 10, `WARNING` yok.
+
+**ROADMAP itirazı kapandı:** P2.1 satırındaki "top-100 sayfalama (ADR-0006)" ifadesi
+**doğrulandı**, düzeltme gerekmedi.
+
+**Yazılan doküman:** ADR-0015 · not 23 (sayfalama, durma koşulları, `for/else`) ·
+not 24 (generator, `yield`, `list` vs `Iterator` trade-off'u) · ayna güncellendi
+(Bölüm 5, sapma kontrolü temiz).
+
+**Çalışma anlaşmasına eklendi — `PROJECT_CONTEXT.md` §1e: soru bütçesi.** Barış:
+*"hızlanalım, soru sorup durma."* Kural: alt adım başına tek soru turu, sadece karar
+soruları, "bilemedim" tek turda kapanır (ikinci kez sorulmaz, cevap verilir). Ölçü:
+*cevap ne olursa olsun aynı kod yazılacaksa o soru sorulmamalıdır.* **Claude projesinin
+instructions alanına elle yansıtılmalı**, yoksa yeni oturum eski davranışa döner.
+
+---
 
 ### 2026-08-24 — OTURUM (ev makinesi): ortam kurulumu, IAM kullanıcı yeniden adlandırıldı
 
@@ -132,7 +174,7 @@ tuzağı, `requests` Session/Response. Sapma kontrolü temiz.
 
 ---
 
-### AÇIK KARAR — P2.1 bunsuz kapanmaz: sayfalama döngüsü nereye ait?
+### ~~AÇIK KARAR — P2.1 bunsuz kapanmaz: sayfalama döngüsü nereye ait?~~ — KAPANDI 2026-08-25 (ADR-0015, seçenek A)
 
 `fetch_top_tracks` **tek sayfa** döndürüyor. ADR-0006 ise "hedef sayıya kadar sayfalama"
 diyor ve gerekçesi kayıtlı: `limit=100` bugün çalışıyor ama Last.fm `limit`'i kırparsa
@@ -1117,6 +1159,13 @@ Eski numaralar (`0–9`, `A–E`) **yeniden kullanılmadı**. Eşleme `ROADMAP.m
 - **P2.2'ye devredilen borç:** raw katman her sayfayı **ayrı** ve `@attr` ile birlikte
   saklamak zorunda; aksi halde `rank` kalıcı olarak kurtarılamaz hale gelir. Bu bir
   "açık soru" değil, unutulması muhtemel bir **kısıt**. → **P2.2**.
+- **P2.3'e devredilen borç: fazla çekme.** `page_size=50`, `target=100` iken ikinci sayfa
+  50'den fazla kayıt dönerse elde 100'den fazla kayıt kalır. **Extract kırpmaz** —
+  kırpmak yeniden şekillendirmedir. Kırpma `rank`'e göre transform katmanında yapılacak.
+  → **P2.3**.
+- **Tavana çarpan koşu exception fırlatmıyor**, `WARNING` basıp eksik veriyle dönüyor
+  (ADR-0015 son madde). Alerting kurulduğunda bu asimetri yeniden değerlendirilecek —
+  log'a düşen bir uyarıyı kimse okumuyorsa o uyarı yok demektir. → **Sonraki tur**.
 - **Aynı gün içinde sayfa kayması.** Chart sayfalar çekilirken yeniden sıralanırsa aynı
   parça iki sayfada görünebilir ve anahtar tek `snapshot_date` içinde çakışır. Gözlenmedi
   (iki fixture farklı sayfalar, kesişim yok) ama çürütülmedi de. → **P2.3 / P2.4**.

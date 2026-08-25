@@ -84,6 +84,8 @@ hatırlanmayan kararlar için uydurma cevap üretir.
 | [20](20-aws-sdk-and-boto3.md) | AWS bir API'dir: konsol/CLI/SDK kardeşliği, `boto3` ne yapıyor, SigV4 imzalama, `client` vs `resource`, `Session` | P1.2 |
 | [21](21-aws-credentials-and-the-credential-chain.md) | IAM kavram haritası, access key anatomisi ve kuralları, `~/.aws` iki dosya ayrımı, **credential chain**, güvenlik yapılmayacaklar listesi | P1.2 |
 | [22](22-packages-init-and-public-api.md) | Modül vs paket, `__init__.py`'nin dört işi, re-export ve kapsülleme, **exception'ların neden arayüzün parçası olduğu**, `__all__`, cold start maliyeti | P2.1 |
+| [23](23-pagination-and-loop-termination.md) | Sayfalama: durma koşulları (sayım vs aritmetik), sonsuz döngü koruması, `for`/`else`, sayfa tavanı, sayfa boyutu seçimi | P2.1 |
+| [24](24-generators-and-yield.md) | Generator ve `yield`, tembel değerlendirme, `list` vs `Iterator` trade-off'u, tek kullanımlık olma tuzağı | P2.1 |
 
 ## Prosedürler
 
