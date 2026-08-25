@@ -175,27 +175,34 @@ commit'i Barış atar, ayna aynı commit'te gelir, tek seferde tek alt adım, ka
 
 ---
 
-## 1e. Çalışma anlaşması — 2026-08-25: **soru bütçesi** (yürürlükteki kural)
+## 1e. Çalışma anlaşması — 2026-08-25: **soru zorunluluğu kaldırıldı**
 
-Barış: *"hızlanalım, soru sorup durma."*
+Barış: *"hızlanalım, soru sorup durma"* ve *"illa açıklamadan önce bana soru sormasını
+istemiyorum."*
 
-Instructions §4 ("önce soru sor, sonra cevap ver") **kaldırılmadı, bütçeye bağlandı.**
+Instructions §4'ün eski hâli ("bir şeyi açıklamadan önce bana o konuda bir soru sor")
+**iptal edildi.** Yerine geçen kural:
 
 | Kural | Ayrıntı |
 |---|---|
-| **Alt adım başına tek soru turu** | Tek mesajda en fazla 2 soru. Tur bitince artık anlatılır. |
-| **Sadece karar soruları** | "Hangi yol, neden?" sorulur. Sözdizimi, parametre adı, hatırlama sorusu sorulmaz — bunların cevabı aranır, akıl yürütülmez. |
-| **"Bilemedim" tek turda kapanır** | Barış bilmiyorsa veya soruyu atlarsa Claude **ikinci kez sormaz**: cevabı verir, gerekçesini anlatır, devam eder. |
-| **Yanlış cevap tekrar sorulmaz** | Yanlışsa düzeltilir (instructions §5) ve doğru cevap aynı mesajda verilir. Doğru cevabı bulana kadar soru tekrarlanmaz. |
-| **Soru turunun yeri sabit** | Yalnızca NEDEN'in başında. NASIL / SEN YAZ / KONTROL arasına soru sokulmaz. |
+| **Varsayılan: doğrudan anlat** | Soru sormak bir ön koşul değil. NEDEN → NASIL → SEN YAZ → KONTROL sırası soru olmadan başlar. |
+| **Soru istisnadır** | Yalnızca cevabın **yazılacak kodu değiştirdiği** yerlerde sorulur; o zaman da tek soru, tek tur. |
+| **Tekrar yok** | "Bilemedim", yanlış cevap veya sessizlik → cevap verilir ve devam edilir. Aynı soru farklı kelimelerle sorulmaz. |
+| **Yeri sabit** | Yalnızca NEDEN'in başında. NASIL / SEN YAZ / KONTROL arasına soru sokulmaz. |
+| **Yanlış cevap yine düzeltilir** | §5 aynen geçerli: yanlışsa net söylenir, gerekçesiyle. Bu bir soru turu değil, geri bildirim. |
+
+**Ölçü:** Bir soru, cevabı yanlış geldiğinde yazılacak kod değişiyorsa sorulmaya değer.
+Cevap ne olursa olsun aynı kod yazılacaksa o soru sorulmamalıdır.
 
 **Gerekçe.** Soru sormanın amacı tanıma–üretme açığını kapatmaktı (bkz. PROGRESS,
-2026-08-24 "Öğrenme yöntemi"). Ama cevabı gelmeyen soru bu açığı kapatmaz, yalnızca tur
-harcar. Üretme pratiği asıl olarak **gövde yazmakta** (§1d) ve **KANIT komutlarını
-çalıştırmakta**; soru-cevap onların yerine geçmez, yanlarında küçük bir kontroldür.
+2026-08-24 "Öğrenme yöntemi"). Ama zorunlu soru turu bu açığı kapatmıyordu: bilinmeyen bir
+konuda sorulan soru "bilemedim" ile bitiyor ve yalnızca tur harcıyordu. Üretme pratiği asıl
+olarak **gövde yazmakta** (§1d) ve **KANIT komutlarını çalıştırmakta**. Ölçüm noktası orası;
+soru-cevap onların yerine geçmiyordu.
 
-**Ölçü:** Bir soru, cevabı yanlış geldiğinde kodun değişmesine sebep oluyorsa sorulmaya
-değer. Cevap ne olursa olsun aynı kod yazılacaksa o soru sorulmamalıdır.
+**Riski, açık yazılsın:** anlatım tamamen tek yönlü olursa yanlış anlamalar ancak kod
+çalışmadığında görünür. Karşı ağırlık, aynanın KANIT komutları ve gövdeyi Barış'ın
+yazmasıdır — ikisi de bırakılırsa bu kural zararlı hâle gelir.
 
 > **Not:** §1d'deki uyarı burada da geçerli — Claude'un davranışını asıl belirleyen metin
 > Claude projesinin **instructions** alanıdır. Bu bölüm oraya yansıtılmadan yeni oturum
