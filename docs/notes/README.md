@@ -86,6 +86,8 @@ hatırlanmayan kararlar için uydurma cevap üretir.
 | [22](22-packages-init-and-public-api.md) | Modül vs paket, `__init__.py`'nin dört işi, re-export ve kapsülleme, **exception'ların neden arayüzün parçası olduğu**, `__all__`, cold start maliyeti | P2.1 |
 | [23](23-pagination-and-loop-termination.md) | Sayfalama: durma koşulları (sayım vs aritmetik), sonsuz döngü koruması, `for`/`else`, sayfa tavanı, sayfa boyutu seçimi | P2.1 |
 | [24](24-generators-and-yield.md) | Generator ve `yield`, tembel değerlendirme, `list` vs `Iterator` trade-off'u, tek kullanımlık olma tuzağı | P2.1 |
+| [25](25-reading-untrusted-json.md) | Dış dünyadan gelen JSON: `.get()` vs `[]`, tip kapısı, "yok"un kılıkları, sentinel isimlendirme, dar `try`, dedup için `set`/`setdefault` | P2.2 |
+| [26](26-etl-vs-elt.md) | ETL vs ELT, medallion katmanları, ham katmanın bedeli, hangi koşulda hangisi | P2.2 |
 
 ## Prosedürler
 

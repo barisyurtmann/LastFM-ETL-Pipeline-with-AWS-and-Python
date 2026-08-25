@@ -12,10 +12,113 @@ Kural: bu dosya yalan söyleyebilir (güncellemeyi unutursan). `git log --onelin
 ---
 
 **Last updated:** 2026-08-25
-**Current step:** P2 — Local extract + transform
-([plan](ROADMAP.md#adım-p2--local-extract--transform))
-**Next sub-step:** **P2.2 — raw'ı S3'e yaz.** P2.1 **kapandı**: extract modülü sayfalama
-dahil çalışıyor, dört kontrol de geçti, ADR-0015 ve notlar 23-24 yazıldı.
+**Current step:** P2 — Local: extract → transform → JSON Lines
+([plan](ROADMAP.md#adım-p2--local-extract--transform--parquet))
+**Next sub-step:** **P2.3 — load modülü.** Satırlar → JSON Lines byte'ları → local
+`data/`. P2.2 **kapandı**: iki tablo üretiliyor, altı kontrol de geçti.
+
+### 2026-08-25 — P2.2 KAPANDI: transform çalışıyor, iki tablo üretiliyor
+
+**Yazılan kod:** `src/lastfm_etl/transform/` — `chart.py` (232 satır) + `__init__.py`.
+`_text`, `_to_int`, `_rank`, `_records` yardımcıları ve `transform_chart`.
+Ayna: `docs/annotated/.../transform/chart.py` (668 satır), sapma kontrolü temiz.
+
+**Bu turda kodu Claude yazdı** (Barış: *"gene sen yaz kodu, annotated ekle, ben
+öğreneyim"*). §1d'nin "gövdeyi Barış yazar" kuralından bilinçli sapma; ayna bu yüzden
+normalden ağır yazıldı (Bölüm 0'da yedi ön koşul kavram).
+
+**Ölçüldü — altı kontrol de geçti:**
+
+| Kontrol | Sonuç |
+|---|---|
+| İki farklı sayfa (1 ve 500) | `rank` `[1,2,3] … [9998,9999]`, 39 satır, 25 sanatçı, 0 atıldı |
+| Edge case fixture | `mbid` yok → `None`, `duration "0"` → `None`, `playcount` `int`, `rank=9981` |
+| Bozuk satırlar | 3 kayıttan 1'i kaldı, ikisi **`WARNING` ile** atıldı |
+| Aynı sayfa iki kez | 20 satır (40 değil) — 20 tekrar dedup'a takıldı, FK bütünlüğü `True` |
+| Naive `datetime` | `TransformError` ile reddedildi |
+| Ayna sapması | boş |
+
+`rank=9981` formülün gerçek kanıtı: `(500-1)*20 + 0 + 1`. 500. sayfa fixture'ı olmasaydı
+formül yalnızca 1. sayfada doğrulanmış olurdu ve `page` çarpanı hiç sınanmazdı.
+
+**Alınan kararlar → ADR-0017:**
+
+| Karar | Gerekçe |
+|---|---|
+| İki tablo, **doğal anahtar** | `mbid` 19 kayıttan 4'ünde **yok**. Bazen eksik olan alan PK olamaz |
+| Surrogate key **yok** | 100 satır/gün ölçeğinde string JOIN bedava. SCD tip 2 gerekirse ADR ile eklenir |
+| **Tek geçiş**, iki tablo | Kurs kodunun FK hatası (song'un artist'i album'den, artist tablosu track'ten) böylece **yapısal olarak** imkânsız |
+| Tek exception tipi | Extract'ta üç vardı çünkü çağıranın kararı vardı. Burada yok. **Hiyerarşinin derinliği = çağıranın vereceği karar sayısı** |
+| Bozuk **sayfa** durdurur, bozuk **satır** atılır | Sayfa okunamazsa arkasındaki her `rank` yanlış olur |
+| `setdefault` dedup'tan **sonra** | Önce olsaydı, atılan satırın sanatçısı `artists`'e girer → **orphan dimension** |
+
+**`docs/SCHEMA.md` yazıldı** — yeni doküman kategorisi: veri sözleşmesi. Kolonlar,
+tipler, anahtarlar, bozuk kayıt politikası. `PROJECT_CONTEXT.md` §8'e eklendi.
+
+**Şema kod yazılırken bir kez değişti: `track_url` ve `artist_url` nullable oldu.**
+Not-null yazılmıştı, ölçülen veride %100 dolu. Ama zorlamanın tek yolu url'i olmayan
+satırı **tamamen atmak** olurdu — anahtar da değil metrik de değil, sadece doğrulama
+linki. **Ders: şemada "not-null" bir dilek değil taahhüttür.** Zorlayamayacağın taahhüdü
+yazma; zorlanmayan not-null, dokümanla kodun sessizce ayrıştığı ilk yerdir.
+
+**Yazılan doküman:** ADR-0017 · not 25 (dış dünyadan gelen JSON'u okumak) · not 26
+(ETL vs ELT) · `docs/SCHEMA.md` · ayna + `annotated/README.md` index'i.
+
+---
+
+### 2026-08-25 — MİMARİ DÜZELTİLDİ: pipeline ETL'e döndü (ADR-0016)
+
+**Barış'ın itirazı:** *"şimdi load yazıyoruz ama ETL'de önce transform olmaz mı"* — ve
+haklı. Plan ELT yapıyordu.
+
+**Çelişki üç gündür duruyordu ve kimse fark etmedi:**
+
+| Belge | Ne diyordu |
+|---|---|
+| ADR-0009 | *"The pipeline is therefore **ETL**, not ELT"* |
+| ADR-0012 | Raw bucket → transform Lambda'sı raw'ı okur → transformed bucket. **Bu ELT'dir** |
+| ROADMAP P2 başlığı | "Local: extract + transform" — ama alt adımı P2.2 "Raw'ı S3'e yaz" diyordu |
+| TOOLING §2 | ETL/ELT ayrımını **doğru** anlatıyor |
+
+**Asıl ders — Barış'ın "bunu daha önce konuşmuştuk, not almanı istemiştim" itirazının
+cevabı bu:** not alınmıştı ve doğruydu (TOOLING §2). Not **bağlamaz.** Planı ROADMAP ve
+ADR'ler bağlar; onlar çelişince not kenarda doğru kalır ve kod yanlış yazılır. Doğru refleks
+"not al" değil, **"planı ve ADR'yi düzelt"**. Bir bilginin nereye yazıldığı, ne yazıldığı
+kadar önemli.
+
+**Alınan karar (ADR-0016):** tek Lambda, tek invocation, extract → transform → load.
+Ham payload hiçbir yere kalıcı yazılmıyor. `lastfm-etl-raw-<ek>` bucket'ı boş kalıyor
+(silinmiyor: S3 adı geri vermiyor, boş bucket bedava). ADR-0012 **supersede edildi**.
+
+**Kabul edilen bedel, açıkça:** transform yanlışsa o günün verisi geri gelmez —
+`chart.getTopTracks` tarih parametresi almıyor, gün yeniden çekilemiyor. ELT'de düzeltme
+"raw'a karşı yeniden çalıştır"dı, artık öyle bir yol yok. Karşılığı P2.4'ün testleri;
+test artık iyi alışkanlık değil **tek emniyet ağı**. Bu bilinçli bir öğrenme tercihi:
+hedef ETL'i öğrenmek, ve adı ETL olan bir ELT kurmak ikisini birden öğretmiyor.
+
+**Değişen planlar:**
+
+| | Eski | Yeni |
+|---|---|---|
+| P2.2 | Raw'ı S3'e yaz | **Transform modülü** |
+| P2.3 | Transform modülü | **Load modülü** — Parquet byte'ı üret, local `data/`'ya yaz |
+| P3 | İki Lambda + S3 PUT tetikleyici + `to_processed/`→`processed/` taşıma | **Tek Lambda** + EventBridge cron + S3'e yazma |
+| Bucket | 2 (raw + transformed) | **1** (transformed) |
+| Idempotency | Dosyayı `processed/`'a taşımak | **Aynı `snapshot_date=` partition'ının üzerine yazmak** |
+
+**Taşınan kısıt:** `rank`'in `@attr` + sayfa içi konumdan üretilmesi zorunluluğu ortadan
+kalkmadı, **yeri değişti**. Artık P2.2'de, transform sırasında üretilecek ve ikinci bir
+şansı yok. ADR-0015'in "sayfalar birleştirilmeden, sıra korunarak" garantisi bu yüzden
+daha da kritik.
+
+**Güncellenen belgeler:** ADR-0016 (yeni) · ADR-0012 (Superseded) · `ROADMAP.md` P2 ve P3
+bölümleri baştan yazıldı · `PROJECT_CONTEXT.md` §4 mimari diyagramı · ADR index.
+
+**Yazılmayan kod:** yok. P2.2'nin (eski) iskeleti sohbette kalmıştı, `src/`'e girmemişti —
+bu yüzden geri alınacak commit de yok. §1d'nin "iskeleti önce sohbette göster" kuralı
+tam olarak bunu ucuzlattı.
+
+---
 
 ### 2026-08-25 — P2.1 KAPANDI: sayfalama yazıldı, ölçüldü
 
@@ -1156,10 +1259,16 @@ Eski numaralar (`0–9`, `A–E`) **yeniden kullanılmadı**. Eşleme `ROADMAP.m
   Doğrulanamaz — Last.fm ölçütü belgelemiyor. Şema notu olarak kalsın.
 - **`rank` bazı SQL lehçelerinde ayrılmış kelime.** Athena/Presto'da `RANK()` bir pencere
   fonksiyonu. Kolon adı olarak sorun çıkarırsa `chart_rank`'e dönülecek. → **P4.2**'de test (Athena).
-- **P2.2'ye devredilen borç:** raw katman her sayfayı **ayrı** ve `@attr` ile birlikte
-  saklamak zorunda; aksi halde `rank` kalıcı olarak kurtarılamaz hale gelir. Bu bir
-  "açık soru" değil, unutulması muhtemel bir **kısıt**. → **P2.2**.
-- **P2.3'e devredilen borç: fazla çekme.** `page_size=50`, `target=100` iken ikinci sayfa
+- ~~**P2.2'ye devredilen borç:** raw katman her sayfayı ayrı saklamalı~~ — **ADR-0016
+  ile geçersiz** (raw katman yok). Kısıt yer değiştirdi: `rank`, transform sırasında
+  sayfa `@attr`'i + sayfa içi konumdan üretilecek ve **ikinci şansı yok**. → **P2.2**.
+- **P2.3'e devredilen borç: dosya yazarken `encoding="utf-8"` zorunlu.** KONTROL 4'ün
+  çıktısında `ADÉLA` → `ADÃ‰LA` göründü. Veri bozuk değil, Git Bash konsolu cp1252 ile
+  basıyor. **Ama** Windows'ta `open()` varsayılan olarak locale encoding kullanır (3.14'te
+  hâlâ öyle), yani `Path.write_text(...)` `encoding` verilmeden çağrılırsa diske giden
+  JSON **gerçekten** bozulur. Lambda'da (Linux, UTF-8) sorun çıkmaz — yani bu, yalnızca
+  geliştirme makinesinde görülen ve prod'da görülmeyen bir hata sınıfı. → **P2.3**.
+- ~~**P2.2'ye devredilen borç: fazla çekme.**~~ — **P2.2'de çözüldü değil, hâlâ açık:** `page_size=50`, `target=100` iken ikinci sayfa
   50'den fazla kayıt dönerse elde 100'den fazla kayıt kalır. **Extract kırpmaz** —
   kırpmak yeniden şekillendirmedir. Kırpma `rank`'e göre transform katmanında yapılacak.
   → **P2.3**.
