@@ -16,6 +16,8 @@
 #:
 #: Tasarim gerekceleri (retry taksonomisi, hata yolu): docs/notes/17
 #: Paket/__init__ konulari: docs/notes/22
+#: Sayfalama ve dongu sonlandirma: docs/notes/23 - generator/yield: docs/notes/24
+#: Sayfalamanin nereye ait oldugu karari: docs/adr/0015
 #:
 #: ============================================================================
 #: BOLUM 0 - ONCE SU YEDI KAVRAM
@@ -392,6 +394,40 @@ RETRYABLE_ERROR_CODES: Final[frozenset[int]] = frozenset({8, 11, 16, 29})
 
 RETRYABLE_STATUS_CODES: Final[frozenset[int]] = frozenset({429, 500, 502, 503, 504})
 
+#: ----------------------------------------------------------------------------
+#: NE: Uc sabit, ucu de bir sayi degil bir KARAR tasiyor. Degerli olan sayinin kendisi
+#:     degil, neden o sayi oldugu - o yuzden yorumlar "ne" degil "neden" yaziyor.
+#:
+#:     DEFAULT_PAGE_SIZE < TARGET_TRACK_COUNT olmasi kasitli. Esit olsalardi dongu her
+#:     kosuda TAM BIR tur donerdi: yazdigimiz sayfalama kodu uretimde hic sinanmaz,
+#:     gercekten gerektigi gun (sunucu 50 yerine 30 dondurdugunde) ILK KEZ calisirdi.
+#:     Ilk kez calisan kod calismaz.
+#:
+#:     MAX_PAGES bir "olmamasi gereken" sinirdir; baglamasi beklenmez. Amaci dogru sonuc
+#:     uretmek degil, YANLIS DURUMDA DURMAK. Acik uclu her dongude boyle bir tavan
+#:     bulunur: prod'da seni uyandiran sey dongunun yanlis cevap vermesi degil, hic
+#:     donmemesidir. Lambda'da bu, timeout'a kadar para yakip hicbir sey yazmadan olmek.
+#:
+#: KANIT:
+#:   uv run python -c "
+#:   from lastfm_etl.extract.api import DEFAULT_PAGE_SIZE, TARGET_TRACK_COUNT, MAX_PAGES
+#:   print(DEFAULT_PAGE_SIZE < TARGET_TRACK_COUNT)  # True -> dongu her kosuda >=2 tur
+#:   print(MAX_PAGES * DEFAULT_PAGE_SIZE)           # 500  -> tavanin kapsadigi kayit
+#:   "
+#:
+#: BIZDE: fetch_top_tracks_pages ucunu de varsayilan olarak alir. Cagiran hicbirini
+#:     bilmek zorunda degil; test uc'unu de override edebilir (KANIT 3, en altta).
+#:     Konu notu: docs/notes/23
+# Deliberately below TARGET_TRACK_COUNT so the pagination path runs on every
+# execution. A loop that makes a single pass is untested code that first runs on the
+# day it matters.
+DEFAULT_PAGE_SIZE: Final = 50
+TARGET_TRACK_COUNT: Final = 100
+
+# Never expected to bind: 100 tracks at 50 a page is two calls. It exists so a server
+# that answers without making progress ends the loop instead of the Lambda timeout.
+MAX_PAGES: Final = 10
+
 
 #: ----------------------------------------------------------------------------
 #: NE: Uc sinif, uc farkli SORU cevapliyor - govde yok, sadece docstring var.
@@ -647,6 +683,58 @@ def _request(
     return payload
 
 
+#: ----------------------------------------------------------------------------
+#: NE: `_` ile baslayan ad, Python'da "bu modulun ic isi" demektir. Dil bunu ZORLAMAZ -
+#:     disaridan cagrilabilir - ama sozlesme nettir: __init__.py'nin __all__ listesine
+#:     girmez, degisirse kimseye haber verilmez. (docs/notes/22)
+#:
+#:     Bu fonksiyon SAYMAK icin var, DEGISTIRMEK icin degil. Payload'in icine bakar,
+#:     track listesini dondurur, payload'a dokunmaz. Okumak yeniden sekillendirmek
+#:     degildir - extract katmaninin "veriyi oldugu gibi dondur" sozlesmesi korunur.
+#:
+#:     isinstance(records, dict) kontrolu bir API tuhafligini kapatiyor: Last.fm'in
+#:     JSON'u XML'den uretiliyor ve XML'de "tek elemanli liste" diye bir sey yoktur.
+#:     Tek kayit kaldiginda liste sessizce nesneye coker. Bu kontrol olmasaydi len()
+#:     cagrisi listenin uzunlugunu degil dict'in ANAHTAR SAYISINI sayardi - yanlis sayi,
+#:     hata yok. Sessiz yanlis, gurultulu yanlistan pahalidir.
+#:
+#: KANIT:
+#:   uv run python -c "
+#:   from lastfm_etl.extract.api import _track_records
+#:   print(len(_track_records({'tracks': {'track': [{'a': 1}, {'b': 2}]}})))  # 2
+#:   print(len(_track_records({'tracks': {'track': {'a': 1}}})))              # 1 <- sarildi
+#:   print(len({'name': 'x', 'playcount': '9'}))                              # 2 <- sarilmasaydi
+#:   "
+#:
+#: BIZDE: Dongunun govdesi 'kac kayit geldi' sorusunun NASIL cevaplandigiyla kirlenmiyor.
+#:     XML kalintisi tek bir yerde yasiyor; yarin baska bir chart metodu eklenirse ayni
+#:     yardimci kullanilir.
+def _track_records(payload: dict[str, Any]) -> list[dict[str, Any]]:
+    """Return the track list inside a chart payload, leaving the payload untouched.
+
+    Reading is not reshaping: the caller needs a count, and the payload it stores must
+    stay exactly as the API sent it.
+
+    Raises:
+        LastfmError: the payload did not carry a readable track list.
+    """
+    tracks = payload.get("tracks")
+    if not isinstance(tracks, dict) or "track" not in tracks:
+        raise LastfmError(
+            f"{TOP_TRACKS_METHOD}: payload carried no track list: {payload!r}"
+        )
+
+    records = tracks["track"]
+    # This JSON is generated from XML, so a one-element list arrives as a bare object.
+    if isinstance(records, dict):
+        return [records]
+    if not isinstance(records, list):
+        raise LastfmError(
+            f"{TOP_TRACKS_METHOD}: unexpected track container: {type(records).__name__}"
+        )
+    return records
+
+
 #: ============================================================================
 #: NE: Bu modulun TEK PUBLIC fonksiyonu (_request alt cizgiyle basliyor: "ic kullanim,
 #:     disaridan cagirma" - bu bir gelenek, Python engellemez).
@@ -743,3 +831,143 @@ def fetch_top_tracks(
 #:     fonksiyonu ust uste cagiracak. O cagiran kendi Session'ini verirse TCP+TLS el
 #:     sikismasi sayfa basina tekrarlanmaz.
     return _request(session or requests.Session(), TOP_TRACKS_METHOD, params)
+
+
+#: ============================================================================
+#: BOLUM 5 - SAYFALAMA: DONGU NEREDE DURUR, NE DONDURUR
+#: ============================================================================
+#: NE: Bu fonksiyonun tek zor karari sudur: dongu ne zaman duracak? Dort aday vardi.
+#:
+#:       1. ceil(target / page_size) kadar sayfa cek       -> YANLIS
+#:       2. @attr icindeki totalPages'e kadar cek          -> YANLIS
+#:       3. Biriken GERCEK kayit sayisi >= target          -> dogru, tek basina yetmez
+#:       4. Gelen sayfa bos -> dur                         -> 3'un sonsuz dongu korumasi
+#:
+#:     1 neden yanlis: aritmetik, page_size'in UYGULANDIGINI varsayar. Last.fm `limit`i
+#:     kirparsa cevap sessizce kisa gelir - HTTP 200, hata belgesi yok. 100 istedin, 40
+#:     geldi; ceil(100/100)=1 dedigi icin dongu biter ve 40 kayit "tam" sayilir. Uc ay
+#:     kimse fark etmez, edildiginde chart geriye donuk cekilemedigi icin veri geri
+#:     gelmez. ADR-0006 tam bunu onlemek icin yazilmisti; ADR-0015 nereye koyacagimizi.
+#:
+#:     2 neden yanlis: totalPages = total / perPage ve `total` sabit 10000 - gercek bir
+#:     sayim degil, tavan (1.8'de olculdu). Yani totalPages hicbir zaman "bitti" demez.
+#:
+#:     Donus tipi list[dict], generator degil: yield edilseydi hata 3. sayfada ciktiginda
+#:     cagiran ilk iki sayfayi coktan S3'e yazmis olurdu. list ile ya hepsi ya hicbiri.
+#:     Esik: sonuc bellege sigmadigi gun generator dogru cevap olur. (docs/notes/24)
+#:
+#:     Sayfalar BIRLESTIRILMEDEN donuyor. Birlestirme her sayfanin @attr'ini (page,
+#:     perPage) silerdi ve rank bu ikisinden turuyor - kurtarilamaz kayip.
+#:
+#: KANIT: (dongu sunucunun sozune degil kendi saydigina bakiyor + tavan calisiyor)
+#:   uv run python -c "
+#:   import logging; logging.basicConfig(level=logging.INFO)
+#:   from lastfm_etl.config import load_config
+#:   from lastfm_etl.extract import fetch_top_tracks_pages
+#:   print(len(fetch_top_tracks_pages(load_config())))                       # 2
+#:   print(len(fetch_top_tracks_pages(load_config(), page_size=100)))        # 1
+#:   print(len(fetch_top_tracks_pages(load_config(), target=10**6, max_pages=3)))
+#:   "                                                                       # 3 + WARNING
+#:
+#: ----------------------------------------------------------------------------
+#: NE: `session = session or requests.Session()` satiri DONGUNUN DISINDA.
+#:     `a or b` Python'da bool dondurmez: a "dogru" ise a'yi, degilse b'yi dondurur.
+#:     Burada "cagiran session verdiyse onu kullan, vermediyse bir tane uret" demek.
+#:
+#:     Dongunun ICINDE olsaydi her sayfa yeni bir Session, yani yeni TCP el sikismasi
+#:     olurdu. Session'in tek varlik sebebi baglanti havuzu (connection pool): ayni
+#:     baglantiyi tekrar kullanmak. Her cagrida yenisini acmak, Session kullanmamakla
+#:     ayni sey - ustelik daha yaniltici, cunku kod dogru gorunur.
+#:
+#: KANIT:
+#:   uv run python -c "
+#:   print(None or 'uretildi')     # uretildi
+#:   print('verildi' or 'uretildi') # verildi
+#:   "
+#:
+#: BIZDE: fetch_top_tracks'in kendi `session or requests.Session()` satiri duruyor, ama
+#:     buradan session GECILDIGI icin orada yeni nesne uretilmiyor. Iki sayfa, tek
+#:     baglanti.
+#:
+#: ----------------------------------------------------------------------------
+#: NE: `for ... else:` - Python'un en cok yanlis okunan yapisi. `else`, dongu bittiginde
+#:     DEGIL, dongu HIC `break` GORMEDEN bittiginde calisir. Adi talihsiz; "nobreak"
+#:     olsaydi kimse yanlis okumazdi.
+#:
+#:     Burada tam olarak "tavana carptim ve hedefe ulasamadim" demenin tek adimli yolu.
+#:     Alternatifi `hit_ceiling = True` gibi bir bayrak degiskeni tutmaktir: ayni is,
+#:     fazladan durum, ve guncellenmeyi unutulabilecek fazladan bir satir.
+#:
+#: KANIT:
+#:   uv run python -c "
+#:   for i in range(3):
+#:       if i == 5: break
+#:   else:
+#:       print('break gormedi -> else calisti')
+#:   for i in range(3):
+#:       if i == 1: break
+#:   else:
+#:       print('bu satir hic basilmaz')
+#:   "
+#:
+#: BIZDE: Iki `break` de normal cikis (hedefe ulasildi / kaynak tukendi) - bunlarda
+#:     WARNING basilmaz. Yalnizca hicbiri calismadan `range` tukenirse tavan baglamistir
+#:     ve o zaman log'a dusen bir WARNING kalir. Exception firlatilmiyor: karar ve
+#:     gerekcesi ADR-0015'in son maddesinde, bilincli bir asimetri.
+def fetch_top_tracks_pages(
+    config: Config,
+    *,
+    target: int = TARGET_TRACK_COUNT,
+    page_size: int = DEFAULT_PAGE_SIZE,
+    max_pages: int = MAX_PAGES,
+    session: requests.Session | None = None,
+) -> list[dict[str, Any]]:
+    """Return whole page payloads until ``target`` tracks have been seen.
+
+    Pages come back verbatim and unmerged: rank is derived from ``@attr`` (page,
+    perPage) plus a record's position inside its page, so merging would destroy it.
+
+    The loop stops on the number of records actually received, never on arithmetic over
+    ``page_size``. Last.fm may answer with fewer records than requested and reports no
+    error when it does, so a computed page count would end the run short and silently.
+
+    Returns:
+        One element per page, in request order. The total may exceed ``target``;
+        trimming belongs to the transform layer, which is allowed to reshape.
+
+    Raises:
+        LastfmError: a page carried no readable track list.
+        LastfmAPIError: the API returned a permanent error document.
+        LastfmTransientError: a retryable failure outlived every attempt.
+    """
+    # One session for every page: the connection pool only pays off when the same
+    # object is reused, and fetch_top_tracks would otherwise open a fresh one per call.
+    session = session or requests.Session()
+
+    pages: list[dict[str, Any]] = []
+    collected = 0
+
+    for page in range(1, max_pages + 1):
+        payload = fetch_top_tracks(config, limit=page_size, page=page, session=session)
+        records = _track_records(payload)
+
+        if not records:
+            logger.info("page %s carried no tracks, stopping early", page)
+            break
+
+        pages.append(payload)
+        collected += len(records)
+
+        if collected >= target:
+            break
+    else:
+        # Reached only when no break ran: the ceiling bound before the target was met.
+        logger.warning(
+            "stopped at the %s page ceiling with %s of %s tracks",
+            max_pages,
+            collected,
+            target,
+        )
+
+    logger.info("collected %s tracks across %s pages", collected, len(pages))
+    return pages
