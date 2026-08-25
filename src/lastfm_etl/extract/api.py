@@ -40,6 +40,16 @@ RETRYABLE_ERROR_CODES: Final[frozenset[int]] = frozenset({8, 11, 16, 29})
 
 RETRYABLE_STATUS_CODES: Final[frozenset[int]] = frozenset({429, 500, 502, 503, 504})
 
+# Deliberately below TARGET_TRACK_COUNT so the pagination path runs on every
+# execution. A loop that makes a single pass is untested code that first runs on the
+# day it matters.
+DEFAULT_PAGE_SIZE: Final = 50
+TARGET_TRACK_COUNT: Final = 100
+
+# Never expected to bind: 100 tracks at 50 a page is two calls. It exists so a server
+# that answers without making progress ends the loop instead of the Lambda timeout.
+MAX_PAGES: Final = 10
+
 
 class LastfmError(Exception):
     """Base class for every failure raised by this module."""
@@ -123,6 +133,32 @@ def _request(
     return payload
 
 
+def _track_records(payload: dict[str, Any]) -> list[dict[str, Any]]:
+    """Return the track list inside a chart payload, leaving the payload untouched.
+
+    Reading is not reshaping: the caller needs a count, and the payload it stores must
+    stay exactly as the API sent it.
+
+    Raises:
+        LastfmError: the payload did not carry a readable track list.
+    """
+    tracks = payload.get("tracks")
+    if not isinstance(tracks, dict) or "track" not in tracks:
+        raise LastfmError(
+            f"{TOP_TRACKS_METHOD}: payload carried no track list: {payload!r}"
+        )
+
+    records = tracks["track"]
+    # This JSON is generated from XML, so a one-element list arrives as a bare object.
+    if isinstance(records, dict):
+        return [records]
+    if not isinstance(records, list):
+        raise LastfmError(
+            f"{TOP_TRACKS_METHOD}: unexpected track container: {type(records).__name__}"
+        )
+    return records
+
+
 def fetch_top_tracks(
     config: Config,
     *,
@@ -149,3 +185,62 @@ def fetch_top_tracks(
     logger.info("fetching %s page=%s limit=%s", TOP_TRACKS_METHOD, page, limit)
 
     return _request(session or requests.Session(), TOP_TRACKS_METHOD, params)
+
+
+def fetch_top_tracks_pages(
+    config: Config,
+    *,
+    target: int = TARGET_TRACK_COUNT,
+    page_size: int = DEFAULT_PAGE_SIZE,
+    max_pages: int = MAX_PAGES,
+    session: requests.Session | None = None,
+) -> list[dict[str, Any]]:
+    """Return whole page payloads until ``target`` tracks have been seen.
+
+    Pages come back verbatim and unmerged: rank is derived from ``@attr`` (page,
+    perPage) plus a record's position inside its page, so merging would destroy it.
+
+    The loop stops on the number of records actually received, never on arithmetic over
+    ``page_size``. Last.fm may answer with fewer records than requested and reports no
+    error when it does, so a computed page count would end the run short and silently.
+
+    Returns:
+        One element per page, in request order. The total may exceed ``target``;
+        trimming belongs to the transform layer, which is allowed to reshape.
+
+    Raises:
+        LastfmError: a page carried no readable track list.
+        LastfmAPIError: the API returned a permanent error document.
+        LastfmTransientError: a retryable failure outlived every attempt.
+    """
+    # One session for every page: the connection pool only pays off when the same
+    # object is reused, and fetch_top_tracks would otherwise open a fresh one per call.
+    session = session or requests.Session()
+
+    pages: list[dict[str, Any]] = []
+    collected = 0
+
+    for page in range(1, max_pages + 1):
+        payload = fetch_top_tracks(config, limit=page_size, page=page, session=session)
+        records = _track_records(payload)
+
+        if not records:
+            logger.info("page %s carried no tracks, stopping early", page)
+            break
+
+        pages.append(payload)
+        collected += len(records)
+
+        if collected >= target:
+            break
+    else:
+        # Reached only when no break ran: the ceiling bound before the target was met.
+        logger.warning(
+            "stopped at the %s page ceiling with %s of %s tracks",
+            max_pages,
+            collected,
+            target,
+        )
+
+    logger.info("collected %s tracks across %s pages", collected, len(pages))
+    return pages

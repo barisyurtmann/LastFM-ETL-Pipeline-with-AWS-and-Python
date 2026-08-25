@@ -16,6 +16,7 @@ from lastfm_etl.extract.api import (
     LastfmError,
     LastfmTransientError,
     fetch_top_tracks,
+    fetch_top_tracks_pages,
 )
 
 __all__ = [
@@ -23,4 +24,5 @@ __all__ = [
     "LastfmError",
     "LastfmTransientError",
     "fetch_top_tracks",
+    "fetch_top_tracks_pages",
 ]
