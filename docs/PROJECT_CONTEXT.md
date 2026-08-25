@@ -303,48 +303,42 @@ sunucudan öğrenme imkânı yok — throttle istemci tarafında kendi sayacın�
 ## 4. Hedef mimari
 
 Kursun mimarisi, Last.fm'e uyarlanmış. ADR-0010 bunu bağlayıcı kapsam olarak kabul eder.
+**2026-08-25'te düzeltildi (ADR-0016):** önceki hâli iki Lambda + iki bucket + raw
+katmandı; o tasarım adı ETL olan bir **ELT** pipeline'ıydı ve ADR-0009 ile çelişiyordu.
 
 ```
 Last.fm API
     │
     ▼
-EventBridge (günlük)  ──►  Lambda: extract  ──►  S3 bucket 1 (raw)
-                                                  raw/to_processed/*.json
-                                                       │
-                                                  (PUT event)
-                                                       ▼
-                                              Lambda: transform
-                                                       │
-                                    ┌──────────────────┴─────────────┐
-                                    ▼                                ▼
-                        S3 bucket 2 (transformed)          raw/processed/ (arşiv)
-                        tracks/*.parquet
-                        artists/*.parquet
-                                    │
-                                    ▼
-                            Glue Crawler
-                                    │
-                                    ▼
-                       Glue Data Catalog  (lastfm_db)
-                                    │
-                                    ▼
-                              Athena (SQL)
+EventBridge (günlük cron)
+    │
+    ▼
+Lambda: lastfm-etl                       <- TEK fonksiyon, tek invocation
+    │   extract    (sayfalar, ADR-0015)
+    │   transform  (nested JSON -> tracks + artists, rank, tipler)
+    │   load       (Parquet byte'lari)
+    ▼
+S3: lastfm-etl-transformed-<ek>
+    tracks/snapshot_date=YYYY-MM-DD/*.parquet
+    artists/snapshot_date=YYYY-MM-DD/*.parquet
+    │
+    ▼
+Glue Crawler  ->  Glue Data Catalog (lastfm_db)  ->  Athena (SQL)
 ```
 
-**İki bucket, kursta olduğu gibi:**
+**Tek bucket.** `lastfm-etl-raw-<ek>` duruyor ama **kullanılmıyor** — S3 silinen bir adı
+güvenilir biçimde geri vermez ve boş bucket maliyetsizdir. Ham payload hiçbir yere kalıcı
+yazılmaz; pipeline'ın ETL olması budur.
 
-| Bucket | İçerik |
-|---|---|
-| `...-lastfm-raw-<sen>` | `raw/to_processed/` → yeni dosyalar · `raw/processed/` → işlenmiş arşiv |
-| `...-lastfm-transformed-<sen>` | `tracks/` · `artists/` (Parquet) |
+**ETL'in bedeli, açık yazılsın:** transform yanlışsa o günün verisi **geri gelmez**.
+`chart.getTopTracks` tarih parametresi almıyor, yani gün yeniden çekilemiyor. ELT'de
+düzeltme "transform'u raw'a karşı yeniden çalıştır"dı; burada öyle bir yol yok. Bunun
+karşılığı P2.4'ün testleridir — test burada iyi bir alışkanlık değil, **tek emniyet ağı**.
 
-Ayrı bucket olmasının sebebi sadece kursu takip etmek değil: transform Lambda'sının
-çıktısı kendisini tetikleyen bucket'a yazılırsa **sonsuz döngü** olur. İki bucket bunu
-yapısal olarak imkânsız kılar.
-
-`raw/to_processed/` → `raw/processed/` taşıması kursun **idempotency mekanizmasıdır**:
-işlenmiş dosya bir daha işlenmez ve neyin işlendiği görülebilir. P3.2'de bilinçli
-kurulacak, kopyalanmayacak.
+**Idempotency dosya taşımayla değil, key ile sağlanır.** Aynı günün ikinci koşusu aynı
+`snapshot_date=` partition'ının üzerine yazar. ADR-0012'deki `to_processed/` →
+`processed/` mekanizması yok ve yerine bir şey konmadı — çünkü onu gerektiren S3
+tetikleyicisi de yok.
 
 **Diyagrama dair iki not:**
 
@@ -355,9 +349,9 @@ kurulacak, kopyalanmayacak.
   maliyeti P4.1'de ölçülüyor. Gerekçe: ADR-0010.
 
 **Geliştirme verisi:** `tests/fixtures/lastfm/` altındaki kayıtlı payload'lar (ADR-0004).
-Transform yazılırken her denemede S3'e gidilmez — fixture'la iterasyon, S3'e gerçek koşu.
-
----
+Transform yazılırken her denemede ağa gidilmez — fixture'la iterasyon, gerçek koşu
+P2.4'te. Local çıktılar `data/` altına yazılır ve gitignore'ludur; `data/` mimarinin
+parçası **değildir**, geliştirme kolaylığıdır.
 
 ---
 
@@ -411,6 +405,7 @@ maliyet optimizasyonu (dosya boyutu, partition sayısı, taranan byte)
 | Yol | Ne tutar | Dil | Ne sıklıkla değişir |
 |---|---|---|---|
 | `docs/PROJECT_CONTEXT.md` | Sabit sözleşme — hedef, tercihler, mimari, çalışma anlaşması | TR | Nadiren |
+| `docs/SCHEMA.md` | **Veri sözleşmesi** — iki tablo, kolon, tip, anahtar | TR | Şema değiştikçe |
 | `docs/ROADMAP.md` | **Plan.** Alt adımlar, bitti tanımları, bağımlılıklar | TR | Adım revize edildikçe |
 | `docs/PROGRESS.md` | **Güncel durum.** Tek durum kaynağı | TR | Her alt adımda |
 | `docs/adr/` | Bu projeye özel, geri alması pahalı kararlar | EN | Karar çıktıkça |

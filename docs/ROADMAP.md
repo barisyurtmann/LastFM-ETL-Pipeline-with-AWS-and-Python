@@ -37,7 +37,7 @@ Her satır bir alt adımın varlık sebebi. Kurs sol sütunu yapıyor; biz sağ 
 | 5 | Hata yolu yok, sadece mutlu yol | timeout, `error` koduna göre retry, gürültülü patlama | P2.1 |
 | 6 | Test yok | `pytest` + elde duran fixture'lar (ADR-0004) | P2.4 |
 | 7 | Kod konsol editörüne yapıştırılıyor | zip paketleme — versiyonlanabilir, `git`'te duran deploy | P3.1 |
-| 8 | `AmazonS3FullAccess` | Least-privilege policy, iki role ayrı | P3.4 |
+| 8 | `AmazonS3FullAccess` | Least-privilege policy, tek rol, tek bucket | P3.4 |
 | 9 | README yok | Mimari şeması + çalıştırma + maliyet tablosu | P4.3 |
 
 ---
@@ -107,60 +107,70 @@ EventBridge (günlük)  ──►  Lambda: extract  ──►  S3 raw bucket
 
 ---
 
-## Adım P2 — Local: extract + transform
+## Adım P2 — Local: extract → transform → Parquet
 
 > Ders P2'nin karşılığı. Bütün iş mantığı burada yazılıyor ve **çalıştığı görülüyor.**
-> P3 bu kodu taşır, yeniden yazmaz.
+> P3 bu kodu taşır, yeniden yazmaz. **S3 bu adımda yok** (ADR-0016) — çıktı local
+> `data/` altına yazılır, ilk S3 yazımı P3'tedir.
 
 | # | Alt adım | Kursta | Structure dersi |
 |---|---|---|---|
-| P2.1 | Extract modülü: `requests`, `format=json`, `timeout`, **gövdeyi status'tan önce oku**, `error` koduna göre retry, top-100 sayfalama (ADR-0006) | `spotipy` her şeyi gizliyor; hata yolu yok | Modül sınırı; hata yönetimi baştan, süs olarak değil |
-| P2.2 | Raw'ı S3'e yaz: `boto3.put_object`, key şeması `raw/to_processed/lastfm_raw_<ts>.json` | Aynı | Raw immutability; ham veri **hiç dokunulmadan** saklanır |
-| P2.3 | Transform modülü: nested JSON → `tracks` + `artists`, `drop_duplicates`, tip dönüşümü, **Parquet** | 3 tablo, CSV | Düzleştirme, foreign key, açık tip |
-| P2.4 | Local uçtan uca çalıştır + `pytest` (fixture'larla, ağsız) | Test yok | Testin ne olduğu; fixture'ın neden kaydedildiği |
+| P2.1 | Extract modülü: `requests`, `format=json`, `timeout`, **gövdeyi status'tan önce oku**, `error` koduna göre retry, top-100 sayfalama (ADR-0006, ADR-0015) | `spotipy` her şeyi gizliyor; hata yolu yok | Modül sınırı; hata yönetimi baştan, süs olarak değil |
+| P2.2 | Transform modülü: nested JSON → `tracks` + `artists`, **`rank`'i `@attr` + sayfa içi konumdan üret**, `drop_duplicates`, açık tip dönüşümü | 3 tablo, düzleştirme `spotipy` çıktısından | Düzleştirme, foreign key, açık tip; türetilmiş alanın nerede üretildiği |
+| P2.3 | Load modülü: satırlar → **JSON Lines byte'ları** (satır başına bir nesne) → local `data/` altına yaz. Aynı fonksiyon P3'te S3'e yazacak — hedef değişir, üretim değişmez | CSV, doğrudan S3'e | Byte üretimi ile hedefe yazmanın ayrılması; serileştirme formatının sorgu motoruyla sözleşmesi |
+| P2.4 | Local uçtan uca çalıştır + `pytest` (fixture'larla, **ağsız**) | Test yok | Testin ne olduğu; fixture'ın neden kaydedildiği |
 
 **Bitti tanımı:**
 
-- [ ] `raw` bucket'ta gerçek JSON var — S3'te, local `data/` klasöründe değil
-- [ ] `transformed` bucket'ta `tracks/` ve `artists/` altında Parquet var
-- [ ] Bozuk `api_key` ile **gürültülü** patlıyor
+- [ ] `data/tracks/` ve `data/artists/` altında gerçek JSON Lines dosyaları var
+- [ ] Dosyalar **satır başına tek JSON nesnesi** — Athena'nın JsonSerDe'sinin tek kabul ettiği biçim
 - [ ] `tracks` tablosunda `(snapshot_date, rank)` tekrar etmiyor
+- [ ] `rank` 1'den başlıyor ve sayfa sınırında **kırılmıyor** (51. kayıt `rank=51`)
 - [ ] Hiçbir sayısal alan string kalmadı (`playcount`, `duration`, `listeners`)
+- [ ] Bozuk `api_key` ile **gürültülü** patlıyor
 - [ ] Bozuk/eksik alanlı bir kayıt geldiğinde davranış **yazılı**: at, null'la, yoksa patlat
 - [ ] `pytest` ağ ve gerçek sır olmadan geçiyor
-- [ ] **Aynı gün iki kez çalıştırıldığında ne olduğu yazılı ve kasıtlı**
+- [ ] **Aynı gün iki kez çalıştırıldığında ne olduğu yazılı ve kasıtlı** (ADR-0016: aynı
+      key'in üzerine yazılır)
 
-**ADR adayı:** Define the curated schema and its explicit types
+**ADR adayı:** Write the curated layer as JSON Lines instead of Parquet · Define the
+curated schema and its explicit types
 
-**Not adayı:** Nested JSON düzleştirme kalıpları · Parquet vs CSV · pytest ve fixture
+**Not adayı:** Nested JSON düzleştirme kalıpları · Serileştirme formatları (JSON Lines vs
+CSV vs Parquet) ve sorgu motoruyla sözleşmesi · pytest ve fixture · ETL vs ELT ve raw
+katmanın bedeli
 
 ---
 
 ## Adım P3 — AWS'ye taşı
 
-> Ders P3'ün karşılığı. **İş mantığı yazılmaz** — P2'nin fonksiyonları paketlenir ve
-> tetikleyicilere bağlanır. İş mantığı değişiyorsa P2 yanlış yazılmıştır.
+> Ders P3'ün karşılığı: *"deploy this code to AWS Lambda, set up the CloudWatch trigger
+> for daily execution, and store the data in S3."*
+> **İş mantığı yazılmaz** — P2'nin fonksiyonları paketlenir ve tetikleyiciye bağlanır.
+> İş mantığı değişiyorsa P2 yanlış yazılmıştır.
 
 | # | Alt adım | Kursta | Structure dersi |
 |---|---|---|---|
-| P3.1 | Extract Lambda: **zip paketleme**, bağımlılık layer'ı, env var, `timeout` 1 dk, `memory` 256 MB | Kod konsol editöründe | Deploy edilebilir artefakt; `git`'te duran kod |
-| P3.2 | Transform Lambda: `get_object` → dönüştür → `put_object` → dosyayı `to_processed/` → `processed/` taşı | Aynı | Yeniden işlemeyi önleyen dosya taşıma = **idempotency mekanizması** |
-| P3.3 | Tetikleyiciler: EventBridge günlük cron + S3 `PUT` (prefix `raw/to_processed/`, suffix `.json`) | Aynı | Zaman-tabanlı vs olay-tabanlı tetik; filtre neden zorunlu |
-| P3.4 | IAM: iki Lambda için **ayrı least-privilege rol** | `AmazonS3FullAccess` | Kullanıcı → rol geçişi; rolün neden kullanıcıdan farklı olduğu |
+| P3.1 | Lambda handler: `handler(event, context)` → P2'nin üç fonksiyonunu sırayla çağırır. **Tek Lambda** (ADR-0016) | Kod konsol editöründe | Handler bir **adaptördür**, iş mantığı taşımaz |
+| P3.2 | Paketleme: zip artefaktı + bağımlılık layer'ı (yalnızca `requests`; `boto3` runtime'da hazır), env var, `timeout`, `memory` | Konsola yapıştırma | Deploy edilebilir artefakt; layer neden var, ne zaman gerekmiyor |
+| P3.3 | S3'e yaz: P2.3'ün load fonksiyonu, hedef `lastfm-etl-transformed-<ek>`. Key: `tracks/snapshot_date=<YYYY-MM-DD>/tracks.json` | Aynı | Partition'lı key şeması; Athena'nın neden umursadığı |
+| P3.4 | Tetikleyici + IAM: EventBridge günlük cron, Lambda için **tek least-privilege rol** | `AmazonS3FullAccess` | Zaman-tabanlı tetik; kullanıcı → rol geçişi |
 
 **Bitti tanımı:**
 
-- [ ] Lambda, P2'nin **aynı fonksiyonunu** çağırıyor — ikinci bir kopya yok
-- [ ] Extract Lambda elle tetiklendi, `raw` bucket'ta dosya oluştu
-- [ ] O dosya transform Lambda'yı **kendiliğinden** tetikledi
-- [ ] Dosya `processed/` altına taşındı, `to_processed/` boş
-- [ ] Rol politikalarında `*` yok, iki rol ayrı
+- [ ] Lambda, P2'nin **aynı fonksiyonlarını** çağırıyor — ikinci bir kopya yok
+- [ ] Elle tetiklendi, `transformed` bucket'ta Parquet oluştu
+- [ ] EventBridge kuralı kurulu ve bir sonraki koşu zamanı görünüyor
+- [ ] Rol politikasında `*` yok; yalnızca tek bucket'a `PutObject`
 - [ ] Lambda patladığında CloudWatch Logs'ta teşhise yeten satır var
-- [ ] `echo $?` / Lambda `statusCode` hatada başarılı görünmüyor
+- [ ] Lambda `statusCode` hatada başarılı görünmüyor
+- [ ] **Aynı günü iki kez çalıştırınca ikinci koşu birincinin üzerine yazıyor**, yeni
+      dosya birikmiyor
 
-**ADR adayı:** Package Lambdas as zip rather than container images
+**ADR adayı:** Package the Lambda as a zip rather than a container image
 
-**Not adayı:** Lambda çalışma modeli (cold start, layer, timeout) · S3 event semantiği
+**Not adayı:** Lambda çalışma modeli (cold start, layer, timeout, `/tmp`) · EventBridge
+cron ifadeleri · Lambda handler imzası ve `event`/`context`
 
 ---
 
@@ -170,7 +180,7 @@ EventBridge (günlük)  ──►  Lambda: extract  ──►  S3 raw bucket
 
 | # | Alt adım | Kursta | Structure dersi |
 |---|---|---|---|
-| P4.1 | Glue Crawler: `transformed` bucket'ı tara, `lastfm_db` oluştur, iki tablo, tipleri **doğrula** | Aynı | Şema çıkarımı; Crawler'ın ne zaman gereksiz olduğu |
+| P4.1 | Glue Crawler: tek veri bucket'ını tara, `lastfm_db` oluştur, iki tablo, **JSON'dan çıkarılan tipleri doğrula** (tarih alanları string gelir) | Aynı | Şema çıkarımı; JSON'da tip neyi taşır neyi taşımaz |
 | P4.2 | Athena: sonuç konumu ayarı, ilk `SELECT`, `tracks ⋈ artists` JOIN | Aynı | Metastore + sorgu motoru ayrımı; `$5/TB` maliyet modeli |
 | P4.3 | README: mimari şeması, çalıştırma adımları, **maliyet tablosu** | README yok | Portfolyo vitrini; bir yabancının projeyi çalıştırabilmesi |
 

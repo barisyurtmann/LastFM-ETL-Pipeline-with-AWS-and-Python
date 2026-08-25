@@ -71,10 +71,12 @@ only upsides was not a real decision.
 | [0009](0009-return-to-a-hand-written-python-pipeline.md) | Return to a hand-written Python pipeline | Accepted |
 | [0010](0010-adopt-the-course-architecture-as-the-project-scope.md) | Adopt the course architecture as the project scope | Accepted |
 | [0011](0011-deploy-all-resources-in-eu-central-1.md) | Deploy all resources in eu-central-1 | Accepted |
-| [0012](0012-separate-raw-and-transformed-data-into-two-buckets.md) | Separate raw and transformed data into two S3 buckets | Accepted |
+| [0012](0012-separate-raw-and-transformed-data-into-two-buckets.md) | Separate raw and transformed data into two S3 buckets | Superseded by 0016 |
 | [0013](0013-structure-the-package-by-pipeline-layer.md) | Structure the package by pipeline layer | Accepted |
 | [0014](0014-use-tenacity-for-retry.md) | Use tenacity for retry instead of a hand-written loop | Accepted |
 | [0015](0015-paginate-inside-the-extraction-layer-and-return-unmerged-pages.md) | Paginate inside the extraction layer and return unmerged pages | Accepted |
+| [0016](0016-transform-in-flight-in-a-single-lambda.md) | Transform in flight in a single Lambda | Accepted |
+| [0017](0017-model-the-curated-layer-as-two-tables-with-natural-keys.md) | Model the curated layer as two tables with natural keys | Accepted |
 
 ## When is a decision an ADR?
 
